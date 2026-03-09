@@ -1,7 +1,7 @@
-#+TITLE: tcpdump-tui Initial Phase Plan
+#+TITLE: lazytcp Initial Phase Plan
 
 * Objective
-Deliver a usable first slice of =tcpdump-tui= that makes live packet exploration easier than raw =tcpdump=/=tshark= usage by supporting fast, in-session filter changes.
+Deliver a usable first slice of =lazytcp= that makes live packet exploration easier than raw =tcpdump=/=tshark= usage by supporting fast, in-session filter changes.
 
 * Scope
 In scope for this phase:
@@ -127,4 +127,16 @@ Record outcomes here as milestones are completed.
 - 2026-03-09: Added non-interactive library API contracts and pcap+tcpdump parity contract tests.
 - 2026-03-09: =cargo fmt= passed (after API+contract test changes).
 - 2026-03-09: =cargo test= passed (unit tests + contract tests).
+- 2026-03-09: =cargo check= passed.
+- 2026-03-09: Runtime no longer uses mock packet rows; CLI now requires a =.pcap= path and loads through the library API.
+- 2026-03-09: =cargo fmt= passed (after pcap CLI wiring).
+- 2026-03-09: =cargo test= passed (unit tests + contract tests).
+- 2026-03-09: =cargo check= passed.
+- 2026-03-09: Improved CLI error UX for missing/invalid args; usage/help now prints clean user-facing text (no Rust debug struct output).
+- 2026-03-09: =cargo fmt= passed (after CLI UX update).
+- 2026-03-09: =cargo test= passed (unit tests + contract tests).
+- 2026-03-09: =cargo check= passed.
+- 2026-03-09: Project references renamed from =tcpdump-tui= to =lazytcp= (crate/bin/docs/plan strings).
+- 2026-03-09: =cargo fmt= passed (after rename updates).
+- 2026-03-09: =cargo test= passed.
 - 2026-03-09: =cargo check= passed.

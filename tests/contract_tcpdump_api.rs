@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use tcpdump_tui::api::{TcpdumpApi, TcpdumpReadRequest};
+use lazytcp::api::{TcpdumpApi, TcpdumpReadRequest};
 
 #[test]
 fn api_matches_tcpdump_contract_without_filter() -> Result<(), Box<dyn Error>> {
@@ -144,7 +144,7 @@ fn fixture_path(label: &str) -> PathBuf {
         .as_nanos();
 
     std::env::temp_dir().join(format!(
-        "tcpdump_tui_{}_{}_{}.pcap",
+        "lazytcp_{}_{}_{}.pcap",
         label,
         std::process::id(),
         timestamp

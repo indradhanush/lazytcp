@@ -32,7 +32,7 @@ pub fn render(frame: &mut Frame, app: &App) {
 
 fn render_header(frame: &mut Frame, app: &App, area: Rect) {
     let status = format!(
-        "tcpdump-tui M1 skeleton | capture: {:?} | packets: {}",
+        "lazytcp | capture: {:?} | packets: {}",
         app.capture_state(),
         app.packets().len()
     );
@@ -103,7 +103,7 @@ fn render_packet_detail(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
     let filter = Paragraph::new(app.filter_input()).block(focused_block(
-        "Filter (placeholder)",
+        "Filter",
         app.focus() == FocusPane::FilterInput,
     ));
 

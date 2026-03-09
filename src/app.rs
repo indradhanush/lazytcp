@@ -19,12 +19,16 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
+        Self::with_packets(Vec::new(), String::new())
+    }
+
+    pub fn with_packets(packets: Vec<PacketSummary>, filter_input: String) -> Self {
         Self {
             should_quit: false,
             focus: FocusPane::PacketList,
-            packets: PacketSummary::demo_rows(),
+            packets,
             selected_packet: 0,
-            filter_input: "host 10.0.0.12 and tcp".to_string(),
+            filter_input,
             capture_state: CaptureState::Idle,
         }
     }
@@ -89,7 +93,30 @@ impl Default for App {
 
 #[cfg(test)]
 mod tests {
+    use crate::domain::PacketSummary;
+
     use super::{App, FocusPane};
+
+    fn sample_packets() -> Vec<PacketSummary> {
+        vec![
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                source: "10.0.0.12.51544".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 0,
+                summary: "Flags [S], length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                source: "10.0.0.12.34211".to_string(),
+                destination: "8.8.8.8.53".to_string(),
+                protocol: "UDP".to_string(),
+                length: 0,
+                summary: "UDP, length 0".to_string(),
+            },
+        ]
+    }
 
     #[test]
     fn cycle_focus_wraps_back_to_packet_list() {
@@ -108,7 +135,7 @@ mod tests {
 
     #[test]
     fn next_packet_stops_at_last_row() {
-        let mut app = App::new();
+        let mut app = App::with_packets(sample_packets(), String::new());
         let last_index = app.packets().len() - 1;
 
         for _ in 0..(app.packets().len() + 3) {
@@ -120,7 +147,7 @@ mod tests {
 
     #[test]
     fn previous_packet_stops_at_zero() {
-        let mut app = App::new();
+        let mut app = App::with_packets(sample_packets(), String::new());
         app.previous_packet();
 
         assert_eq!(app.selected_packet_index(), 0);

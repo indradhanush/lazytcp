@@ -1,4 +1,4 @@
-# AGENTS Guide for `tcpdump-tui`
+# AGENTS Guide for `lazytcp`
 
 ## Purpose
 
@@ -79,7 +79,7 @@ Use small, verifiable slices:
   - no architectural/design decision,
   - no production-risk behavior change.
 - For lightweight tasks, execute directly and run the minimum verification commands from `Verification Policy`.
-- This repository `AGENTS.md` overrides global planning defaults for work in `tcpdump-tui`.
+- This repository `AGENTS.md` overrides global planning defaults for work in `lazytcp`.
 - If instruction conflicts remain unclear, ask Dhanush before proceeding.
 
 ## Verification Policy (Required)
@@ -119,7 +119,7 @@ cargo run
 - Add unit tests in `src/domain.rs` for filter parsing/normalization and match behavior.
 - Add tests in `src/capture.rs` for backend argument construction and parsing boundaries.
 - Contract tests must use a `.pcap` fixture plus `tcpdump` output as the parity baseline.
-- Automated verification must call the `tcpdump-tui` library API; do not rely on driving the interactive TUI in tests.
+- Automated verification must call the `lazytcp` library API; do not rely on driving the interactive TUI in tests.
 - Keep API contracts explicit and stable so parity checks against `tcpdump` outputs remain reproducible.
 - Keep capture-facing tests deterministic (mock process output unless explicitly testing integration behavior).
 - If UI behavior changes, keep baseline keyboard navigation (`q`, `j/down`, `k/up`) stable unless requirements change.
