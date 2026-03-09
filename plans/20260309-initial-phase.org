@@ -1,0 +1,114 @@
+#+TITLE: tcpdump-tui Initial Phase Plan
+
+* Objective
+Deliver a usable first slice of =tcpdump-tui= that makes live packet exploration easier than raw =tcpdump=/=tshark= usage by supporting fast, in-session filter changes.
+
+* Scope
+In scope for this phase:
+- Single local capture session.
+- Terminal UI built with =ratatui=.
+- Live packet list with lightweight summaries.
+- Interactive filter editing and immediate re-application.
+- Packet detail view for selected row.
+
+Out of scope for this phase:
+- Full pcap analysis workflows.
+- Multi-node/remote capture orchestration.
+- Wireshark-level protocol decode breadth.
+- Persistent profile/config system.
+
+* Architecture Slice
+- =src/domain.rs=
+  - Define packet summary/detail models.
+  - Define typed filter model and normalization rules.
+- =src/capture.rs=
+  - Define capture backend trait.
+  - Implement initial backend using external tool invocation with line-buffered output.
+  - Convert backend output into domain packet events.
+- =src/app.rs=
+  - Maintain app state: capture state, packet ring buffer, selected row, active filter, filter input mode.
+  - Handle key actions and state transitions.
+- =src/ui.rs=
+  - Render: header/status, packet table, filter input bar, packet detail pane.
+- =src/main.rs=
+  - Terminal lifecycle, event loop, and graceful shutdown.
+
+* Milestones
+** M1: App Skeleton and Event Loop
+Deliverables:
+- Basic =ratatui= app shell with startup/shutdown correctness.
+- Keyboard handling baseline: =q=, =j/down=, =k/up=, =tab= for pane/focus switching.
+- Placeholder panes for packet list, filter input, details.
+
+Acceptance criteria:
+- App launches and exits cleanly without terminal corruption.
+- Focus/selection movement is visible and stable.
+
+** M2: Capture Backend Integration
+Deliverables:
+- Capture backend trait with one concrete implementation.
+- Background capture task that streams packet summaries to app state.
+- Backpressure control via bounded channel/ring buffer.
+
+Acceptance criteria:
+- Live packet rows appear continuously from local interface/input source.
+- App remains responsive while capture is active.
+- Capture process is stopped reliably on exit.
+
+** M3: Interactive Filtering
+Deliverables:
+- Filter input mode (enter, edit, submit, clear).
+- Typed filter representation supporting:
+  - host/source/destination
+  - protocol/traffic type
+  - port
+- Re-apply filter live without restarting app.
+
+Acceptance criteria:
+- User can refine filter iteratively in one session.
+- Packet list updates reflect the active filter with low latency.
+- Invalid filter input yields non-crashing inline feedback.
+
+** M4: Packet Detail Drilldown
+Deliverables:
+- Select packet row and render decoded detail pane.
+- Display key fields (timestamp, src, dst, protocol, ports, length, summary text).
+
+Acceptance criteria:
+- Detail pane tracks selected packet correctly.
+- Navigation does not interrupt capture stream.
+
+** M5: Stabilization and Tests
+Deliverables:
+- Unit tests for filter parsing/normalization/matching in =domain.rs=.
+- Unit tests for capture argument construction and parser boundaries in =capture.rs=.
+- Error-path handling for backend startup failure and malformed output.
+
+Acceptance criteria:
+- Critical domain and capture logic paths covered by deterministic tests.
+- User-facing error states are explicit and recoverable.
+
+* Execution Order
+1. M1 app shell and input loop.
+2. M2 streaming capture path.
+3. M3 live filter model + UI flow.
+4. M4 detail pane integration.
+5. M5 test hardening and cleanup.
+
+* Risks and Mitigations
+- Risk: External capture output variability.
+  - Mitigation: Isolate parser; keep strict fallback handling and unit fixtures.
+- Risk: UI lag under high packet volume.
+  - Mitigation: Bounded buffers, truncation strategy, incremental rendering.
+- Risk: Filter UX complexity grows too quickly.
+  - Mitigation: Start with compact typed grammar and incremental extensions.
+
+* Definition of Done (Initial Phase)
+- Operator can run one capture session, browse packets, edit filters live, and inspect packet details.
+- Terminal state is always restored on normal exit and error exit.
+- Core logic is covered by deterministic tests.
+
+* Verification Outcomes
+Record outcomes here as milestones are completed.
+
+- Pending
