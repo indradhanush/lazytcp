@@ -111,6 +111,7 @@ cargo run
 - Commit frequently in small, reviewable increments.
 - Use conventional commit format (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
 - Prefer one logical concern per commit; avoid mixing unrelated changes.
+- Do not wait for a user prompt to commit: once a slice is complete and verified (or verification limits are documented), commit it immediately.
 - Before each commit, ensure applicable `Verification Policy` commands have been run for the current changes.
 - If the tree is dirty, stage and commit the relevant finished slice before starting a new one.
 
