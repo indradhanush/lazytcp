@@ -25,6 +25,10 @@ Out of scope for this phase:
   - Define capture backend trait.
   - Implement initial backend using external tool invocation with line-buffered output.
   - Convert backend output into domain packet events.
+- =src/api.rs=
+  - Expose non-interactive API contracts so tests and agents can verify behavior without driving the TUI.
+- =src/lib.rs=
+  - Export stable library modules for test and automation entrypoints.
 - =src/app.rs=
   - Maintain app state: capture state, packet ring buffer, selected row, active filter, filter input mode.
   - Handle key actions and state transitions.
@@ -82,10 +86,15 @@ Acceptance criteria:
 Deliverables:
 - Unit tests for filter parsing/normalization/matching in =domain.rs=.
 - Unit tests for capture argument construction and parser boundaries in =capture.rs=.
+- Contract tests that:
+  - Generate/read a =.pcap= fixture file.
+  - Run =tcpdump= over that fixture.
+  - Compare typed library API outputs with direct =tcpdump= outputs for parity.
 - Error-path handling for backend startup failure and malformed output.
 
 Acceptance criteria:
 - Critical domain and capture logic paths covered by deterministic tests.
+- Core verification is executable through the library API; no interactive TUI driving is required for automated checks.
 - User-facing error states are explicit and recoverable.
 
 * Execution Order
@@ -111,4 +120,11 @@ Acceptance criteria:
 * Verification Outcomes
 Record outcomes here as milestones are completed.
 
-- Pending
+- 2026-03-09: M1 implementation started.
+- 2026-03-09: =cargo fmt= passed.
+- 2026-03-09: =cargo test= failed in this environment due to blocked network access to =index.crates.io= (dependency fetch failure).
+- 2026-03-09: =cargo check= failed in this environment due to blocked network access to =index.crates.io= (dependency fetch failure).
+- 2026-03-09: Added non-interactive library API contracts and pcap+tcpdump parity contract tests.
+- 2026-03-09: =cargo fmt= passed (after API+contract test changes).
+- 2026-03-09: =cargo test= passed (unit tests + contract tests).
+- 2026-03-09: =cargo check= passed.
