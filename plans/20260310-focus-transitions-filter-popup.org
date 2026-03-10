@@ -1,0 +1,38 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Focus Transitions
+:END:
+#+TITLE: lazytcp Focus Transitions for Filter Popup and Slash Key
+
+* Objective
+Adjust focus transitions so confirming a filter popup sends focus to packets and pressing =/= focuses the filter pane.
+
+* Requested Behavior
+- After pressing =Enter= to confirm a filter popup, focus moves to =Packets= pane.
+- Pressing =/= from normal navigation focuses the filter pane.
+
+* Scope
+In scope:
+- Update focus behavior in =src/app.rs= for popup confirmation.
+- Add filter-pane focus helper in =src/app.rs=.
+- Wire =/= key handling in =src/main.rs=.
+- Add/adjust unit tests for focus transitions.
+
+Out of scope:
+- Popup rendering changes.
+- Filter matching semantics.
+
+* Implementation Plan
+1. Add explicit =focus_filter_selector= helper in app state.
+2. Move focus to packet list in =confirm_filter_popup= after applying selection.
+3. Bind =/= in main event handler to focus filter selector outside popup mode.
+4. Add tests covering popup-confirm focus transition and slash key mapping path.
+5. Run =cargo fmt=, =cargo test=, and =cargo check=.
+
+* Verification Outcomes
+- 2026-03-10: Plan created.
+- 2026-03-10: Updated popup confirmation in =src/app.rs= to move focus to the packets pane after applying filters.
+- 2026-03-10: Added =focus_filter_selector= helper in =src/app.rs= and wired =/= key handling in =src/main.rs= to focus the filter pane.
+- 2026-03-10: Added app tests for popup-confirm focus behavior and filter-pane focus helper behavior.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.

@@ -328,6 +328,7 @@ fn handle_event(app: &mut App) -> AppResult<()> {
                 }
                 KeyCode::Char('q') => app.quit(),
                 KeyCode::Char('C') => app.clear_all_filters(),
+                KeyCode::Char('/') => app.focus_filter_selector(),
                 KeyCode::Char('j') | KeyCode::Down => app.move_down(),
                 KeyCode::Char('k') | KeyCode::Up => app.move_up(),
                 KeyCode::Tab => app.cycle_focus(),

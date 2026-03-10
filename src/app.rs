@@ -293,6 +293,7 @@ impl App {
             &self.active_filter_values_by_dimension,
         );
         self.apply_active_filter();
+        self.focus = FocusPane::PacketList;
     }
 
     pub fn toggle_filter_popup_selection(&mut self) {
@@ -455,6 +456,10 @@ impl App {
 
     pub fn focus_filter_input(&mut self) {
         self.focus = FocusPane::FilterInput;
+    }
+
+    pub fn focus_filter_selector(&mut self) {
+        self.focus = FocusPane::FilterSelector;
     }
 
     pub fn focus_packet_list(&mut self) {
@@ -1431,8 +1436,38 @@ mod tests {
 
         assert!(!app.is_filter_popup_open());
         assert_eq!(app.filter_expression(), "host = 8.8.8.8");
+        assert_eq!(app.focus(), FocusPane::PacketList);
         assert_eq!(app.packets().len(), 1);
         assert_eq!(app.packets()[0].destination, "8.8.8.8.53");
+    }
+
+    #[test]
+    fn date_time_popup_confirm_moves_focus_to_packet_list() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+        app.cycle_focus();
+        assert_eq!(app.focus(), FocusPane::PacketList);
+
+        select_filter_dimension(&mut app, FilterDimension::DateTime);
+        app.open_filter_popup();
+        type_into_date_time_popup(&mut app, "1970-01-01 00:00:02.002000");
+        app.confirm_filter_popup();
+
+        assert_eq!(app.focus(), FocusPane::PacketList);
+        assert_eq!(
+            app.filter_expression(),
+            "date time >= 1970-01-01 00:00:02.002000"
+        );
+    }
+
+    #[test]
+    fn focus_filter_selector_moves_focus_to_filter_pane() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+        app.cycle_focus();
+        assert_eq!(app.focus(), FocusPane::PacketList);
+
+        app.focus_filter_selector();
+
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
     }
 
     #[test]
