@@ -75,7 +75,7 @@ fn run() -> Result<(), CliError> {
     };
 
     let packets = load_packets(&args)?;
-    let filter_input = args.filter_args.join(" ");
+    let filter_input = String::new();
 
     let mut terminal = init_terminal()
         .map_err(|err| CliError::runtime(format!("error: failed to initialize terminal: {err}")))?;

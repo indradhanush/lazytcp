@@ -12,6 +12,7 @@ pub enum FocusPane {
 pub struct App {
     should_quit: bool,
     focus: FocusPane,
+    all_packets: Vec<PacketSummary>,
     packets: Vec<PacketSummary>,
     selected_packet: usize,
     filter_dimensions: Vec<FilterDimension>,
@@ -26,16 +27,19 @@ impl App {
     }
 
     pub fn with_packets(packets: Vec<PacketSummary>, filter_input: String) -> Self {
-        Self {
+        let mut app = Self {
             should_quit: false,
-            focus: FocusPane::PacketList,
+            focus: FocusPane::FilterSelector,
+            all_packets: packets.clone(),
             packets,
             selected_packet: 0,
             filter_dimensions: FilterDimension::ALL.to_vec(),
             selected_filter_dimension: 0,
             filter_input,
             capture_state: CaptureState::Idle,
-        }
+        };
+        app.apply_active_filter();
+        app
     }
 
     pub fn should_quit(&self) -> bool {
@@ -79,10 +83,12 @@ impl App {
 
     pub fn insert_filter_input_char(&mut self, ch: char) {
         self.filter_input.push(ch);
+        self.apply_active_filter();
     }
 
     pub fn backspace_filter_input(&mut self) {
         self.filter_input.pop();
+        self.apply_active_filter();
     }
 
     pub fn focus(&self) -> FocusPane {
@@ -111,10 +117,12 @@ impl App {
 
         self.selected_filter_dimension =
             (self.selected_filter_dimension + 1).min(self.filter_dimensions.len() - 1);
+        self.apply_active_filter();
     }
 
     pub fn previous_filter_dimension(&mut self) {
         self.selected_filter_dimension = self.selected_filter_dimension.saturating_sub(1);
+        self.apply_active_filter();
     }
 
     pub fn move_down(&mut self) {
@@ -135,21 +143,84 @@ impl App {
 
     pub fn cycle_focus(&mut self) {
         self.focus = match self.focus {
-            FocusPane::PacketList => FocusPane::FilterSelector,
-            FocusPane::FilterSelector => FocusPane::PacketDetail,
+            FocusPane::FilterSelector => FocusPane::PacketList,
+            FocusPane::PacketList => FocusPane::PacketDetail,
             FocusPane::PacketDetail => FocusPane::FilterInput,
-            FocusPane::FilterInput => FocusPane::PacketList,
+            FocusPane::FilterInput => FocusPane::FilterSelector,
         };
     }
 
     pub fn reverse_cycle_focus(&mut self) {
         self.focus = match self.focus {
-            FocusPane::PacketList => FocusPane::FilterInput,
+            FocusPane::FilterSelector => FocusPane::FilterInput,
             FocusPane::FilterInput => FocusPane::PacketDetail,
-            FocusPane::PacketDetail => FocusPane::FilterSelector,
-            FocusPane::FilterSelector => FocusPane::PacketList,
+            FocusPane::PacketDetail => FocusPane::PacketList,
+            FocusPane::PacketList => FocusPane::FilterSelector,
         };
     }
+
+    fn apply_active_filter(&mut self) {
+        let query = self.filter_input.trim().to_ascii_lowercase();
+
+        if query.is_empty() {
+            self.packets = self.all_packets.clone();
+            self.clamp_selected_packet();
+            return;
+        }
+
+        let dimension = self.selected_filter_dimension();
+        self.packets = self
+            .all_packets
+            .iter()
+            .filter(|packet| packet_matches_filter(packet, dimension, &query))
+            .cloned()
+            .collect();
+        self.clamp_selected_packet();
+    }
+
+    fn clamp_selected_packet(&mut self) {
+        if self.packets.is_empty() {
+            self.selected_packet = 0;
+            return;
+        }
+
+        self.selected_packet = self.selected_packet.min(self.packets.len() - 1);
+    }
+}
+
+fn packet_matches_filter(packet: &PacketSummary, dimension: FilterDimension, query: &str) -> bool {
+    match dimension {
+        FilterDimension::Host => {
+            endpoint_host(&packet.source).contains(query)
+                || endpoint_host(&packet.destination).contains(query)
+                || packet.source.to_ascii_lowercase().contains(query)
+                || packet.destination.to_ascii_lowercase().contains(query)
+        }
+        FilterDimension::Source => packet.source.to_ascii_lowercase().contains(query),
+        FilterDimension::Destination => packet.destination.to_ascii_lowercase().contains(query),
+        FilterDimension::Port => {
+            endpoint_port(&packet.source).is_some_and(|port| port.contains(query))
+                || endpoint_port(&packet.destination).is_some_and(|port| port.contains(query))
+        }
+        FilterDimension::Protocol => packet.protocol.to_ascii_lowercase().contains(query),
+    }
+}
+
+fn endpoint_host(endpoint: &str) -> String {
+    if let Some((host, port)) = endpoint.rsplit_once('.') {
+        if !host.is_empty() && port.chars().all(|ch| ch.is_ascii_digit()) {
+            return host.to_ascii_lowercase();
+        }
+    }
+    endpoint.to_ascii_lowercase()
+}
+
+fn endpoint_port(endpoint: &str) -> Option<&str> {
+    let (host, port) = endpoint.rsplit_once('.')?;
+    if !host.is_empty() && port.chars().all(|ch| ch.is_ascii_digit()) {
+        return Some(port);
+    }
+    None
 }
 
 impl Default for App {
@@ -186,12 +257,12 @@ mod tests {
     }
 
     #[test]
-    fn cycle_focus_wraps_back_to_packet_list() {
+    fn cycle_focus_wraps_back_to_filter_selector() {
         let mut app = App::new();
-        assert_eq!(app.focus(), FocusPane::PacketList);
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
 
         app.cycle_focus();
-        assert_eq!(app.focus(), FocusPane::FilterSelector);
+        assert_eq!(app.focus(), FocusPane::PacketList);
 
         app.cycle_focus();
         assert_eq!(app.focus(), FocusPane::PacketDetail);
@@ -200,7 +271,7 @@ mod tests {
         assert_eq!(app.focus(), FocusPane::FilterInput);
 
         app.cycle_focus();
-        assert_eq!(app.focus(), FocusPane::PacketList);
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
     }
 
     #[test]
@@ -274,6 +345,8 @@ mod tests {
     #[test]
     fn move_down_in_packet_list_focus_advances_packet_selection() {
         let mut app = App::with_packets(sample_packets(), String::new());
+        app.cycle_focus();
+        assert_eq!(app.focus(), FocusPane::PacketList);
 
         app.move_down();
 
@@ -283,7 +356,6 @@ mod tests {
     #[test]
     fn move_down_in_filter_selector_focus_advances_filter_selection() {
         let mut app = App::new();
-        app.cycle_focus();
         assert_eq!(app.focus(), FocusPane::FilterSelector);
 
         app.move_down();
@@ -292,9 +364,9 @@ mod tests {
     }
 
     #[test]
-    fn reverse_cycle_focus_wraps_back_to_packet_list() {
+    fn reverse_cycle_focus_wraps_back_to_filter_selector() {
         let mut app = App::new();
-        assert_eq!(app.focus(), FocusPane::PacketList);
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
 
         app.reverse_cycle_focus();
         assert_eq!(app.focus(), FocusPane::FilterInput);
@@ -303,9 +375,38 @@ mod tests {
         assert_eq!(app.focus(), FocusPane::PacketDetail);
 
         app.reverse_cycle_focus();
-        assert_eq!(app.focus(), FocusPane::FilterSelector);
+        assert_eq!(app.focus(), FocusPane::PacketList);
 
         app.reverse_cycle_focus();
-        assert_eq!(app.focus(), FocusPane::PacketList);
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+    }
+
+    #[test]
+    fn protocol_filter_input_reduces_visible_packets() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+        assert_eq!(app.packets().len(), 2);
+
+        for _ in 0..4 {
+            app.next_filter_dimension();
+        }
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
+
+        app.insert_filter_input_char('u');
+        app.insert_filter_input_char('d');
+        app.insert_filter_input_char('p');
+
+        assert_eq!(app.packets().len(), 1);
+        assert_eq!(app.packets()[0].protocol, "UDP");
+    }
+
+    #[test]
+    fn changing_filter_dimension_reapplies_existing_query() {
+        let mut app = App::with_packets(sample_packets(), "8.8.8.8".to_string());
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Host);
+        assert_eq!(app.packets().len(), 1);
+
+        app.next_filter_dimension();
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Source);
+        assert_eq!(app.packets().len(), 0);
     }
 }
