@@ -1,5 +1,5 @@
 use crate::capture::CaptureState;
-use crate::domain::PacketSummary;
+use crate::domain::{FilterDimension, PacketSummary};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FocusPane {
@@ -13,6 +13,8 @@ pub struct App {
     focus: FocusPane,
     packets: Vec<PacketSummary>,
     selected_packet: usize,
+    filter_dimensions: Vec<FilterDimension>,
+    selected_filter_dimension: usize,
     filter_input: String,
     capture_state: CaptureState,
 }
@@ -28,6 +30,8 @@ impl App {
             focus: FocusPane::PacketList,
             packets,
             selected_packet: 0,
+            filter_dimensions: FilterDimension::ALL.to_vec(),
+            selected_filter_dimension: 0,
             filter_input,
             capture_state: CaptureState::Idle,
         }
@@ -53,6 +57,21 @@ impl App {
         self.packets.get(self.selected_packet)
     }
 
+    pub fn filter_dimensions(&self) -> &[FilterDimension] {
+        &self.filter_dimensions
+    }
+
+    pub fn selected_filter_dimension_index(&self) -> usize {
+        self.selected_filter_dimension
+    }
+
+    pub fn selected_filter_dimension(&self) -> FilterDimension {
+        self.filter_dimensions
+            .get(self.selected_filter_dimension)
+            .copied()
+            .unwrap_or(FilterDimension::Host)
+    }
+
     pub fn filter_input(&self) -> &str {
         &self.filter_input
     }
@@ -76,6 +95,19 @@ impl App {
         self.selected_packet = self.selected_packet.saturating_sub(1);
     }
 
+    pub fn next_filter_dimension(&mut self) {
+        if self.filter_dimensions.is_empty() {
+            return;
+        }
+
+        self.selected_filter_dimension =
+            (self.selected_filter_dimension + 1).min(self.filter_dimensions.len() - 1);
+    }
+
+    pub fn previous_filter_dimension(&mut self) {
+        self.selected_filter_dimension = self.selected_filter_dimension.saturating_sub(1);
+    }
+
     pub fn cycle_focus(&mut self) {
         self.focus = match self.focus {
             FocusPane::PacketList => FocusPane::FilterInput,
@@ -93,7 +125,7 @@ impl Default for App {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::PacketSummary;
+    use crate::domain::{FilterDimension, PacketSummary};
 
     use super::{App, FocusPane};
 
@@ -151,5 +183,35 @@ mod tests {
         app.previous_packet();
 
         assert_eq!(app.selected_packet_index(), 0);
+    }
+
+    #[test]
+    fn selected_filter_dimension_defaults_to_host() {
+        let app = App::new();
+
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Host);
+        assert_eq!(app.selected_filter_dimension_index(), 0);
+    }
+
+    #[test]
+    fn next_filter_dimension_stops_at_last_option() {
+        let mut app = App::new();
+        let last_index = app.filter_dimensions().len() - 1;
+
+        for _ in 0..(app.filter_dimensions().len() + 3) {
+            app.next_filter_dimension();
+        }
+
+        assert_eq!(app.selected_filter_dimension_index(), last_index);
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
+    }
+
+    #[test]
+    fn previous_filter_dimension_stops_at_zero() {
+        let mut app = App::new();
+        app.previous_filter_dimension();
+
+        assert_eq!(app.selected_filter_dimension_index(), 0);
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Host);
     }
 }
