@@ -1248,6 +1248,19 @@ mod tests {
         ]
     }
 
+    fn sample_packets_with_arp() -> Vec<PacketSummary> {
+        let mut packets = sample_packets();
+        packets.push(PacketSummary {
+            timestamp: "1970-01-01 00:00:04.004000".to_string(),
+            source: "10.0.0.2".to_string(),
+            destination: "10.0.0.1".to_string(),
+            protocol: "ARP".to_string(),
+            length: 46,
+            summary: "Request who-has 10.0.0.1 tell 10.0.0.2, length 46".to_string(),
+        });
+        packets
+    }
+
     fn select_filter_dimension(app: &mut App, target: FilterDimension) {
         for _ in 0..app.filter_dimensions().len() {
             if app.selected_filter_dimension() == target {
@@ -1515,6 +1528,37 @@ mod tests {
 
         assert_eq!(app.filter_expression(), "protocol in [tcp, udp]");
         assert_eq!(app.packets().len(), 3);
+    }
+
+    #[test]
+    fn protocol_popup_includes_arp_candidate_when_packets_contain_arp() {
+        let mut app = App::with_packets(sample_packets_with_arp(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::Protocol);
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("protocol popup should expose candidates");
+
+        assert_eq!(
+            candidates,
+            &["arp".to_string(), "tcp".to_string(), "udp".to_string()]
+        );
+    }
+
+    #[test]
+    fn protocol_filter_matches_arp_packets() {
+        let mut app = App::with_packets(sample_packets_with_arp(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::Protocol);
+        app.open_filter_popup();
+        move_filter_popup_to_candidate(&mut app, "arp");
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "protocol = arp");
+        assert_eq!(app.packets().len(), 1);
+        assert_eq!(app.packets()[0].protocol, "ARP");
     }
 
     #[test]

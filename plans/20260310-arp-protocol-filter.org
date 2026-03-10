@@ -1,0 +1,36 @@
+:PROPERTIES:
+:CATEGORY: lazytcp ARP Protocol Filter
+:END:
+#+TITLE: lazytcp ARP Protocol Filter Support
+
+* Objective
+Ensure ARP packets parsed from pcap are represented in app state so the Protocol filter can show and filter =arp=.
+
+* Requested Behavior
+- When pcap contains ARP packets, Protocol popup includes =arp=.
+- Selecting =arp= filters packet list to ARP packets.
+
+* Scope
+In scope:
+- Extend tcpdump line parsing to include ARP lines.
+- Add parser tests for ARP request/reply lines.
+- Add app tests for protocol candidates/filtering with ARP packets.
+
+Out of scope:
+- Non-ARP link-layer protocol expansions.
+- Capture backend process changes.
+
+* Implementation Plan
+1. Add ARP parsing branch in =src/api.rs= and keep existing IP/IP6 behavior intact.
+2. Add API unit tests for ARP line parsing correctness.
+3. Add app-level tests for protocol popup candidate inclusion and ARP filtering.
+4. Run =cargo fmt=, =cargo test=, and =cargo check=.
+
+* Verification Outcomes
+- 2026-03-10: Plan created.
+- 2026-03-10: Added ARP parsing support in =src/api.rs= with endpoint extraction for request/reply summaries.
+- 2026-03-10: Added API tests for ARP request and ARP reply parsing in =src/api.rs=.
+- 2026-03-10: Added app tests covering protocol popup =arp= candidate inclusion and =protocol = arp= filtering.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.

@@ -87,6 +87,10 @@ fn is_truncated_dump_error(stderr: &str) -> bool {
 }
 
 pub fn parse_tcpdump_line(line: &str) -> Option<PacketSummary> {
+    parse_ip_packet_line(line).or_else(|| parse_arp_packet_line(line))
+}
+
+fn parse_ip_packet_line(line: &str) -> Option<PacketSummary> {
     let (timestamp, payload) = line
         .split_once(" IP ")
         .or_else(|| line.split_once(" IP6 "))?;
@@ -102,6 +106,42 @@ pub fn parse_tcpdump_line(line: &str) -> Option<PacketSummary> {
         length: parse_length(summary).unwrap_or(0),
         summary: summary.trim().to_string(),
     })
+}
+
+fn parse_arp_packet_line(line: &str) -> Option<PacketSummary> {
+    let (timestamp, summary) = line.split_once(" ARP, ")?;
+    let summary = summary.trim();
+    let (source, destination) = arp_endpoints_from_summary(summary);
+
+    Some(PacketSummary {
+        timestamp: timestamp.trim().to_string(),
+        source,
+        destination,
+        protocol: "ARP".to_string(),
+        length: parse_length(summary).unwrap_or(0),
+        summary: summary.to_string(),
+    })
+}
+
+fn arp_endpoints_from_summary(summary: &str) -> (String, String) {
+    if let Some(remainder) = summary.strip_prefix("Request who-has ") {
+        if let Some((target, source_remainder)) = remainder.split_once(" tell ") {
+            let source = source_remainder
+                .split_once(',')
+                .map(|(value, _)| value)
+                .unwrap_or(source_remainder)
+                .trim();
+            return (source.to_string(), target.trim().to_string());
+        }
+    }
+
+    if let Some(remainder) = summary.strip_prefix("Reply ") {
+        if let Some((source, _)) = remainder.split_once(" is-at ") {
+            return (source.trim().to_string(), "unknown".to_string());
+        }
+    }
+
+    ("unknown".to_string(), "unknown".to_string())
 }
 
 fn classify_protocol(source: &str, destination: &str, summary: &str) -> String {
@@ -167,6 +207,30 @@ mod tests {
         assert_eq!(packet.source, "10.0.0.12.34211");
         assert_eq!(packet.destination, "8.8.8.8.53");
         assert_eq!(packet.length, 0);
+    }
+
+    #[test]
+    fn parses_arp_request_line_into_packet_summary() {
+        let line =
+            "1970-01-01 00:00:03.003000 ARP, Request who-has 10.0.0.1 tell 10.0.0.2, length 46";
+        let packet = parse_tcpdump_line(line).expect("line should parse");
+
+        assert_eq!(packet.protocol, "ARP");
+        assert_eq!(packet.source, "10.0.0.2");
+        assert_eq!(packet.destination, "10.0.0.1");
+        assert_eq!(packet.length, 46);
+    }
+
+    #[test]
+    fn parses_arp_reply_line_into_packet_summary() {
+        let line =
+            "1970-01-01 00:00:04.004000 ARP, Reply 10.0.0.1 is-at aa:bb:cc:dd:ee:ff, length 28";
+        let packet = parse_tcpdump_line(line).expect("line should parse");
+
+        assert_eq!(packet.protocol, "ARP");
+        assert_eq!(packet.source, "10.0.0.1");
+        assert_eq!(packet.destination, "unknown");
+        assert_eq!(packet.length, 28);
     }
 
     #[test]
