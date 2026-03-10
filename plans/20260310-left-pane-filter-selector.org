@@ -1,0 +1,103 @@
+#+TITLE: lazytcp Left Filter Pane Plan
+
+* Objective
+Add a left-side, scrollable filter selector pane so operators can quickly choose a filter dimension before refining filter input.
+
+* Requested UX
+- Left pane shows filter options in a scrollable list.
+- Filter options for v1:
+  - host
+  - source
+  - destination
+  - port
+  - protocol
+
+* Current Baseline (2026-03-10)
+- The main body currently renders two panes: packet list and packet detail.
+- Filter text is shown in a bottom bar, not as a selectable list.
+- Focus cycle is currently: packet list -> filter input -> packet detail.
+
+* Scope
+In scope:
+- Add a dedicated left filter selector pane rendered as a list.
+- Make the filter list scrollable with stable selection/highlight.
+- Add focus/navigation behavior for the new pane while preserving existing keys (=q=, =j/down=, =k/up=, =tab=).
+- Reflect selected filter dimension in app state so follow-up input workflows can use it.
+
+Out of scope:
+- Full filter expression parser redesign.
+- Backend/live-capture reconfiguration changes.
+- Additional filter dimensions beyond the five requested options.
+
+* Architecture Slice
+- =src/domain.rs=
+  - Introduce typed filter dimension enum for the five selectable options.
+- =src/app.rs=
+  - Add filter list state, selected index, and movement helpers.
+  - Extend focus model to include the left filter pane.
+  - Keep packet list navigation behavior unchanged when packet pane is focused.
+- =src/ui.rs=
+  - Update horizontal body layout to include a left filter pane.
+  - Render filter options as a stateful list with selection highlight and scroll behavior.
+  - Keep packet detail rendering unchanged except for layout adjustments.
+- =src/main.rs=
+  - Route key events based on focused pane.
+  - Update =tab= focus cycle order to include filter pane.
+- =src/capture.rs=
+  - No behavior change expected for this slice.
+
+* Milestones
+** M1: Filter Dimension State
+Deliverables:
+- Typed filter dimension model for =host/source/destination/port/protocol=.
+- App state stores available dimensions and active selection.
+- Unit tests for selection bounds/wrap behavior (as decided in implementation).
+
+Acceptance criteria:
+- App can report currently selected filter dimension deterministically.
+- Selection movement never panics at bounds.
+
+** M2: Left Pane Rendering
+Deliverables:
+- Three-column body layout with new left filter pane.
+- Stateful list rendering with clear focused/unfocused styles.
+- Scroll behavior for filter list (future-safe even with a larger list).
+
+Acceptance criteria:
+- Filter pane is always visible in the body.
+- Current selection is clearly highlighted.
+- Focus border changes remain consistent across panes.
+
+** M3: Input Wiring and Regression Coverage
+Deliverables:
+- Key handling updates for pane-aware navigation.
+- Focus cycle includes filter pane and remains predictable.
+- Tests updated/added for focus order and selection interactions.
+
+Acceptance criteria:
+- =q= quits, =tab= cycles focus, =j/down= and =k/up= move selection in the focused list.
+- Packet navigation remains unchanged when packet pane is focused.
+- Existing baseline tests pass with new pane behavior.
+
+* Execution Order
+1. Implement typed filter dimension + app selection state.
+2. Integrate left pane UI and layout updates.
+3. Wire input handling and extend tests.
+4. Run verification and finalize.
+
+* Risks and Mitigations
+- Risk: Keybinding ambiguity between packet and filter list navigation.
+  - Mitigation: Explicitly gate movement handlers by focus pane and test both paths.
+- Risk: Layout crowding on narrow terminals.
+  - Mitigation: Use conservative pane constraints and ensure detail pane wraps text.
+- Risk: Scope drift into full filter editing UX redesign.
+  - Mitigation: Keep this slice limited to dimension selection and existing filter bar compatibility.
+
+* Definition of Done
+- Left pane exists with scrollable selection for exactly five requested filter options.
+- Focus and navigation remain stable and predictable.
+- No regressions in packet selection behavior or quit flow.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for left filter selector pane slice.
+- 2026-03-10: No Rust source changed in this step; cargo verification commands not required.
