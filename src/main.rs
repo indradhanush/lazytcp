@@ -212,6 +212,9 @@ fn handle_event(app: &mut App) -> AppResult<()> {
                 KeyCode::Enter if app.focus() == FocusPane::FilterSelector => {
                     app.open_filter_popup()
                 }
+                KeyCode::Char('c') if app.focus() == FocusPane::FilterSelector => {
+                    app.clear_selected_filter_dimension()
+                }
                 KeyCode::Char('q') => app.quit(),
                 KeyCode::Char('C') => app.clear_all_filters(),
                 KeyCode::Char('j') | KeyCode::Down => app.move_down(),

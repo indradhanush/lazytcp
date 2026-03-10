@@ -423,7 +423,7 @@ fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_footer(frame: &mut Frame, area: Rect) {
     let footer = Paragraph::new(
-        "q: quit | enter on filter by pane: open popup | popup: space toggle, c clear category, C clear all, enter apply, esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
+        "q: quit | filter by pane: c clear selected category | enter: open popup | popup: space toggle, c clear category, C clear all, enter apply, esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
     );
     frame.render_widget(footer, area);
 }

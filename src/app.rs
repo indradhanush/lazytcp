@@ -222,6 +222,25 @@ impl App {
         self.apply_active_filter();
     }
 
+    pub fn clear_selected_filter_dimension(&mut self) {
+        if let Some(values) = self
+            .active_filter_values_by_dimension
+            .get_mut(self.selected_filter_dimension)
+        {
+            values.clear();
+        }
+
+        if let Some(popup) = self.filter_popup.as_mut() {
+            popup.selected_values.clear();
+        }
+
+        self.filter_expression = build_filter_expression(
+            &self.filter_dimensions,
+            &self.active_filter_values_by_dimension,
+        );
+        self.apply_active_filter();
+    }
+
     pub fn focus_filter_input(&mut self) {
         self.focus = FocusPane::FilterInput;
     }
@@ -861,6 +880,35 @@ mod tests {
 
         assert_eq!(app.filter_expression(), "");
         assert_eq!(app.packets().len(), 3);
+    }
+
+    #[test]
+    fn clear_selected_filter_dimension_only_clears_current_category() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        app.open_filter_popup();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1");
+
+        for _ in 0..4 {
+            app.next_filter_dimension();
+        }
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
+
+        app.open_filter_popup();
+        app.move_down();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1 and protocol = udp");
+        assert_eq!(app.packets().len(), 0);
+
+        app.clear_selected_filter_dimension();
+
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1");
+        assert_eq!(app.packets().len(), 2);
+        assert!(app.is_filter_dimension_active(FilterDimension::Host));
+        assert!(!app.is_filter_dimension_active(FilterDimension::Protocol));
     }
 
     #[test]
