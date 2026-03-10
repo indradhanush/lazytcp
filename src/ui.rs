@@ -108,78 +108,123 @@ fn render_filter_selector(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_packet_detail(frame: &mut Frame, app: &App, area: Rect) {
-    let lines = if let Some(packet) = app.selected_packet() {
-        render_packet_detail_component(packet)
+    let block = focused_block("Packet Detail", app.focus() == FocusPane::PacketDetail);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if inner.width == 0 || inner.height == 0 {
+        return;
+    }
+
+    if let Some(packet) = app.selected_packet() {
+        render_packet_detail_component(frame, packet, inner);
     } else {
-        vec![Line::raw("No packet selected")]
-    };
-
-    let detail = Paragraph::new(lines)
-        .block(focused_block(
-            "Packet Detail",
-            app.focus() == FocusPane::PacketDetail,
-        ))
-        .wrap(Wrap { trim: true });
-
-    frame.render_widget(detail, area);
+        frame.render_widget(Paragraph::new("No packet selected"), inner);
+    }
 }
 
-fn render_packet_detail_component(packet: &PacketSummary) -> Vec<Line<'static>> {
+fn render_packet_detail_component(frame: &mut Frame, packet: &PacketSummary, area: Rect) {
     if let Some(details) = tcp_packet_details(packet) {
-        render_tcp_packet_visualizer(packet, &details)
+        render_tcp_packet_visualizer(frame, packet, &details, area);
     } else {
-        render_default_packet_detail(packet)
+        render_default_packet_detail(frame, packet, area);
     }
 }
 
 fn render_tcp_packet_visualizer(
+    frame: &mut Frame,
     packet: &PacketSummary,
     details: &TcpPacketDetails,
-) -> Vec<Line<'static>> {
-    let source_port = format_option(details.source_port.map(|port| port.to_string()));
-    let destination_port = format_option(details.destination_port.map(|port| port.to_string()));
-    let sequence_number = format_option(details.sequence_number.as_deref().map(str::to_string));
-    let acknowledgement_number = format_option(
-        details
-            .acknowledgement_number
-            .as_deref()
-            .map(str::to_string),
-    );
-    let data_offset = format_option(
-        details
-            .data_offset_words
-            .map(|words| format!("{words} words ({} bytes)", words as usize * 4)),
-    );
-    let reserved_bits = format_option(details.reserved_bits.as_deref().map(str::to_string));
-    let window_size = format_option(details.window_size.map(|size| size.to_string()));
-    let checksum = format_option(details.checksum.as_deref().map(str::to_string));
-    let urgent_pointer = format_option(details.urgent_pointer.map(|pointer| pointer.to_string()));
-    let options = format_option(details.options.as_deref().map(str::to_string));
+    area: Rect,
+) {
+    if area_too_small_for_tcp_layout(area) {
+        render_default_packet_detail(frame, packet, area);
+        return;
+    }
 
-    vec![
-        Line::raw(format!("timestamp: {}", packet.timestamp)),
-        Line::raw(format!("source: {}", packet.source)),
-        Line::raw(format!("destination: {}", packet.destination)),
-        Line::raw(""),
-        Line::raw("TCP packet visualizer"),
-        Line::raw("+-----------------------------------------------------------+"),
-        Line::raw(format!(
-            "| Source Port: {:<16} | Destination Port: {:<15}|",
-            source_port, destination_port
-        )),
-        Line::raw("+-----------------------------------------------------------+"),
-        Line::raw(format!(
-            "| Sequence Number: {:<12} | Ack Number: {:<17}|",
-            sequence_number, acknowledgement_number
-        )),
-        Line::raw("+-----------------------------------------------------------+"),
-        Line::raw(format!(
-            "| Data Offset: {:<16} | Reserved: {:<19}|",
-            data_offset, reserved_bits
-        )),
-        Line::raw("+-----------------------------------------------------------+"),
-        Line::raw(format!(
-            "| Flags: NS={} CWR={} ECE={} URG={} ACK={} PSH={} RST={} SYN={} FIN={}     |",
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(3),
+        ])
+        .split(area);
+
+    let ports_row = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(rows[0]);
+
+    render_sub_pane(
+        frame,
+        ports_row[0],
+        "Source Port",
+        format_option(details.source_port.map(|port| port.to_string())),
+    );
+    render_sub_pane(
+        frame,
+        ports_row[1],
+        "Destination Port",
+        format_option(details.destination_port.map(|port| port.to_string())),
+    );
+
+    render_sub_pane(
+        frame,
+        rows[1],
+        "Sequence Number",
+        format_option(details.sequence_number.as_deref().map(str::to_string)),
+    );
+
+    render_sub_pane(
+        frame,
+        rows[2],
+        "Acknowledgment Number",
+        format_option(
+            details
+                .acknowledgement_number
+                .as_deref()
+                .map(str::to_string),
+        ),
+    );
+
+    let control_row = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(13),
+            Constraint::Percentage(9),
+            Constraint::Percentage(28),
+            Constraint::Percentage(50),
+        ])
+        .split(rows[3]);
+
+    render_sub_pane(
+        frame,
+        control_row[0],
+        "Data Offset",
+        format_option(
+            details
+                .data_offset_words
+                .map(|words| format!("{words} words / {}B", words as usize * 4)),
+        ),
+    );
+    render_sub_pane(
+        frame,
+        control_row[1],
+        "Reserved",
+        format_option(details.reserved_bits.as_deref().map(str::to_string)),
+    );
+
+    render_sub_pane(
+        frame,
+        control_row[2],
+        "Flags",
+        format!(
+            "N{} C{} E{} U{} A{} P{} R{} S{} F{} [{}]",
             bit(details.flags.ns),
             bit(details.flags.cwr),
             bit(details.flags.ece),
@@ -189,29 +234,59 @@ fn render_tcp_packet_visualizer(
             bit(details.flags.rst),
             bit(details.flags.syn),
             bit(details.flags.fin),
-        )),
-        Line::raw(format!("| Flags(raw): {:<47}|", details.flags.raw)),
-        Line::raw("+-----------------------------------------------------------+"),
-        Line::raw(format!(
-            "| Window: {:<21} | Checksum: {:<20}|",
-            window_size, checksum
-        )),
-        Line::raw(format!("| Urgent Pointer: {:<45}|", urgent_pointer)),
-        Line::raw("+-----------------------------------------------------------+"),
-        Line::raw(format!("| Options: {:<52}|", options)),
-        Line::raw(format!(
-            "| Payload Length: {:<45}|",
-            format!("{} bytes", details.payload_length)
-        )),
-        Line::raw("+-----------------------------------------------------------+"),
-        Line::raw(""),
-        Line::raw("summary:"),
-        Line::raw(packet.summary.clone()),
-    ]
+            if details.flags.raw.is_empty() {
+                "-"
+            } else {
+                &details.flags.raw
+            }
+        ),
+    );
+
+    render_sub_pane(
+        frame,
+        control_row[3],
+        "Window Size",
+        format_option(details.window_size.map(|size| size.to_string())),
+    );
+
+    let checksum_row = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(rows[4]);
+
+    render_sub_pane(
+        frame,
+        checksum_row[0],
+        "Checksum",
+        format_option(details.checksum.as_deref().map(str::to_string)),
+    );
+    render_sub_pane(
+        frame,
+        checksum_row[1],
+        "Urgent Pointer",
+        format_option(details.urgent_pointer.map(|pointer| pointer.to_string())),
+    );
+
+    render_sub_pane(
+        frame,
+        rows[5],
+        "Options",
+        format_option(details.options.as_deref().map(str::to_string)),
+    );
+
+    render_sub_pane(
+        frame,
+        rows[6],
+        "Data / Payload",
+        format!(
+            "{} -> {}\nlen: {} bytes\nsummary: {}",
+            packet.source, packet.destination, details.payload_length, packet.summary
+        ),
+    );
 }
 
-fn render_default_packet_detail(packet: &PacketSummary) -> Vec<Line<'static>> {
-    vec![
+fn render_default_packet_detail(frame: &mut Frame, packet: &PacketSummary, area: Rect) {
+    let lines = vec![
         Line::raw(format!("timestamp: {}", packet.timestamp)),
         Line::raw(format!("source: {}", packet.source)),
         Line::raw(format!("destination: {}", packet.destination)),
@@ -220,7 +295,25 @@ fn render_default_packet_detail(packet: &PacketSummary) -> Vec<Line<'static>> {
         Line::raw(""),
         Line::raw("summary:"),
         Line::raw(packet.summary.clone()),
-    ]
+    ];
+
+    let detail = Paragraph::new(lines).wrap(Wrap { trim: true });
+    frame.render_widget(detail, area);
+}
+
+fn render_sub_pane(frame: &mut Frame, area: Rect, title: &str, value: impl Into<String>) {
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+
+    let pane = Paragraph::new(value.into())
+        .block(Block::default().borders(Borders::ALL).title(title))
+        .wrap(Wrap { trim: true });
+    frame.render_widget(pane, area);
+}
+
+fn area_too_small_for_tcp_layout(area: Rect) -> bool {
+    area.width < 36 || area.height < 21
 }
 
 fn format_option(value: Option<String>) -> String {
