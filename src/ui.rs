@@ -1,7 +1,9 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
+use ratatui::widgets::{
+    Block, Borders, Clear, List, ListItem, ListState, Padding, Paragraph, Wrap,
+};
 use ratatui::Frame;
 
 use crate::app::{App, FocusPane};
@@ -429,6 +431,11 @@ fn focused_block(title: &str, is_focused: bool) -> Block<'_> {
         .borders(Borders::ALL)
         .title(title)
         .border_style(border_style)
+        .padding(if is_focused {
+            Padding::new(2, 2, 0, 0)
+        } else {
+            Padding::ZERO
+        })
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
@@ -453,7 +460,7 @@ fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
 
 #[cfg(test)]
 mod tests {
-    use super::centered_rect;
+    use super::{centered_rect, focused_block};
     use ratatui::layout::Rect;
 
     #[test]
@@ -474,5 +481,15 @@ mod tests {
 
         assert_eq!(inner.width, 60);
         assert_eq!(inner.height, 28);
+    }
+
+    #[test]
+    fn focused_block_uses_thicker_horizontal_padding() {
+        let area = Rect::new(0, 0, 30, 10);
+        let focused_inner = focused_block("focused", true).inner(area);
+        let unfocused_inner = focused_block("unfocused", false).inner(area);
+
+        assert!(focused_inner.width < unfocused_inner.width);
+        assert_eq!(focused_inner.height, unfocused_inner.height);
     }
 }
