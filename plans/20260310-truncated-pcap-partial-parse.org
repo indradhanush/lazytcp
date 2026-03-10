@@ -1,0 +1,31 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Truncated PCAP Partial Parse
+:END:
+#+TITLE: lazytcp Truncated PCAP Partial Parse
+
+* Objective
+Allow lazytcp to parse and return all decodable packets from a pcap when tcpdump exits with a known truncated-dump EOF error.
+
+* Scope
+In scope:
+- Update tcpdump result handling in =src/api.rs= to treat truncated dump EOF as partial success.
+- Preserve existing hard-failure behavior for other tcpdump errors.
+- Add unit tests for truncated and non-truncated failure branches.
+
+Out of scope:
+- UI warning surfaces for partial reads.
+- Capture writer-side remediation.
+
+* Implementation Plan
+1. Refactor tcpdump command output handling into a helper in =src/api.rs=.
+2. Accept partial stdout when stderr indicates truncated dump file EOF.
+3. Add unit tests that validate success, truncated partial success, and non-truncated error behavior.
+4. Run =cargo fmt=, =cargo test=, and =cargo check=.
+
+* Verification Outcomes
+- 2026-03-10: Plan created.
+- 2026-03-10: Updated =src/api.rs= to allow partial parse on =tcpdump= truncated-dump EOF errors while preserving hard failures for other errors.
+- 2026-03-10: Added unit tests for success path, truncated partial-success path, and non-truncated failure path in =src/api.rs=.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.

@@ -36,21 +36,13 @@ impl TcpdumpApi {
         let output = command.output().map_err(|err| {
             CaptureError::new(format!("failed to execute tcpdump command: {err}"))
         })?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(CaptureError::new(format!(
-                "tcpdump exited with status {}: {}",
-                output.status,
-                stderr.trim()
-            )));
-        }
-
-        let stdout = String::from_utf8(output.stdout).map_err(|err| {
-            CaptureError::new(format!("tcpdump output was not valid UTF-8: {err}"))
-        })?;
-
-        Ok(parse_tcpdump_stdout(&stdout))
+        let status_display = output.status.to_string();
+        parse_tcpdump_command_output(
+            output.status.success(),
+            &status_display,
+            output.stdout,
+            &output.stderr,
+        )
     }
 }
 
@@ -62,6 +54,36 @@ impl Default for TcpdumpApi {
 
 pub fn parse_tcpdump_stdout(stdout: &str) -> Vec<PacketSummary> {
     stdout.lines().filter_map(parse_tcpdump_line).collect()
+}
+
+fn parse_tcpdump_command_output(
+    status_success: bool,
+    status_display: &str,
+    stdout: Vec<u8>,
+    stderr: &[u8],
+) -> Result<Vec<PacketSummary>, CaptureError> {
+    let stdout = String::from_utf8(stdout)
+        .map_err(|err| CaptureError::new(format!("tcpdump output was not valid UTF-8: {err}")))?;
+    let packets = parse_tcpdump_stdout(&stdout);
+
+    if status_success {
+        return Ok(packets);
+    }
+
+    let stderr = String::from_utf8_lossy(stderr);
+    if is_truncated_dump_error(&stderr) {
+        return Ok(packets);
+    }
+
+    Err(CaptureError::new(format!(
+        "tcpdump exited with status {}: {}",
+        status_display,
+        stderr.trim()
+    )))
+}
+
+fn is_truncated_dump_error(stderr: &str) -> bool {
+    stderr.contains("truncated dump file")
 }
 
 pub fn parse_tcpdump_line(line: &str) -> Option<PacketSummary> {
@@ -123,7 +145,7 @@ fn parse_length(summary: &str) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_tcpdump_line;
+    use super::{parse_tcpdump_command_output, parse_tcpdump_line};
 
     #[test]
     fn parses_tcp_line_into_packet_summary() {
@@ -145,5 +167,48 @@ mod tests {
         assert_eq!(packet.source, "10.0.0.12.34211");
         assert_eq!(packet.destination, "8.8.8.8.53");
         assert_eq!(packet.length, 0);
+    }
+
+    #[test]
+    fn read_output_returns_packets_when_status_is_success() {
+        let stdout = "1970-01-01 00:00:02.002000 IP 10.0.0.12.34211 > 8.8.8.8.53: UDP, length 0\n";
+        let packets =
+            parse_tcpdump_command_output(true, "exit status: 0", stdout.as_bytes().to_vec(), b"")
+                .expect("success should parse packets");
+
+        assert_eq!(packets.len(), 1);
+        assert_eq!(packets[0].protocol, "UDP");
+    }
+
+    #[test]
+    fn read_output_allows_partial_packets_on_truncated_dump_error() {
+        let stdout = "1970-01-01 00:00:01.001000 IP 10.0.0.12.51544 > 1.1.1.1.443: Flags [S], seq 1, win 65535, length 0\n";
+        let stderr = b"reading from file sample.pcap, link-type EN10MB (Ethernet)\ntcpdump: pcap_loop: truncated dump file; tried to read 2962 captured bytes, only got 2215\n";
+        let packets = parse_tcpdump_command_output(
+            false,
+            "exit status: 1",
+            stdout.as_bytes().to_vec(),
+            stderr,
+        )
+        .expect("truncated dump should still return parsed packets");
+
+        assert_eq!(packets.len(), 1);
+        assert_eq!(packets[0].protocol, "TCP");
+    }
+
+    #[test]
+    fn read_output_returns_error_for_non_truncated_failure() {
+        let err = parse_tcpdump_command_output(
+            false,
+            "exit status: 2",
+            Vec::new(),
+            b"tcpdump: syntax error in filter expression",
+        )
+        .expect_err("non-truncated failures should return an error");
+
+        assert_eq!(
+            err.to_string(),
+            "tcpdump exited with status exit status: 2: tcpdump: syntax error in filter expression"
+        );
     }
 }
