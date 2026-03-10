@@ -598,7 +598,7 @@ fn tcp_flags_from_summary(summary: &str) -> Vec<&'static str> {
 }
 
 fn all_tcp_flag_labels() -> [&'static str; 9] {
-    ["ns", "cwr", "ece", "urg", "ack", "psh", "rst", "syn", "fin"]
+    ["NS", "CWR", "ECE", "URG", "ACK", "PSH", "RST", "SYN", "FIN"]
 }
 
 fn tcp_flag_label(symbol: char) -> Option<&'static str> {
@@ -1287,15 +1287,15 @@ mod tests {
         assert_eq!(
             candidates,
             &[
-                "ns".to_string(),
-                "cwr".to_string(),
-                "ece".to_string(),
-                "urg".to_string(),
-                "ack".to_string(),
-                "psh".to_string(),
-                "rst".to_string(),
-                "syn".to_string(),
-                "fin".to_string(),
+                "NS".to_string(),
+                "CWR".to_string(),
+                "ECE".to_string(),
+                "URG".to_string(),
+                "ACK".to_string(),
+                "PSH".to_string(),
+                "RST".to_string(),
+                "SYN".to_string(),
+                "FIN".to_string(),
             ]
         );
     }
@@ -1312,8 +1312,8 @@ mod tests {
             .filter_popup_candidates()
             .expect("tcp flags popup should expose candidates")
             .iter()
-            .position(|candidate| candidate == "syn")
-            .expect("syn flag should be present");
+            .position(|candidate| candidate == "SYN")
+            .expect("SYN flag should be present");
         for _ in 0..syn_index {
             app.move_down();
         }
@@ -1321,7 +1321,7 @@ mod tests {
         app.toggle_filter_popup_selection();
         app.confirm_filter_popup();
 
-        assert_eq!(app.filter_expression(), "tcp flags = syn");
+        assert_eq!(app.filter_expression(), "tcp flags = SYN");
         assert_eq!(app.packets().len(), 1);
         assert!(app.packets()[0].summary.contains("Flags [S]"));
     }

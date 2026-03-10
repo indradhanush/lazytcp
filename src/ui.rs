@@ -131,9 +131,9 @@ fn filter_dimension_item(
 
 fn filter_dimension_label(app: &App, dimension: crate::domain::FilterDimension) -> String {
     if app.is_filter_dimension_active(dimension) {
-        format!("{} *", dimension.as_str())
+        format!("{} *", dimension.display_name())
     } else {
-        dimension.as_str().to_string()
+        dimension.display_name().to_string()
     }
 }
 
@@ -439,7 +439,7 @@ fn render_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
 
     let dimension = app
         .filter_popup_dimension()
-        .map(|value| value.as_str())
+        .map(|value| value.display_name())
         .unwrap_or("filter");
     let candidates = app.filter_popup_candidates().unwrap_or(&[]);
 

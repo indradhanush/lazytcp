@@ -43,6 +43,22 @@ impl FilterDimension {
             FilterDimension::IcmpType => "icmp type",
         }
     }
+
+    pub fn display_name(self) -> &'static str {
+        match self {
+            FilterDimension::Host => "Host",
+            FilterDimension::Source => "Source",
+            FilterDimension::Destination => "Destination",
+            FilterDimension::Port => "Port",
+            FilterDimension::SourcePort => "Src Port",
+            FilterDimension::DestinationPort => "Dst Port",
+            FilterDimension::Protocol => "Protocol",
+            FilterDimension::TcpFlags => "TCP Flags",
+            FilterDimension::IpVersion => "IP Version",
+            FilterDimension::TrafficClass => "Traffic Class",
+            FilterDimension::IcmpType => "ICMP Type",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -243,6 +259,24 @@ mod tests {
         assert_eq!(FilterDimension::IpVersion.as_str(), "ip version");
         assert_eq!(FilterDimension::TrafficClass.as_str(), "traffic class");
         assert_eq!(FilterDimension::IcmpType.as_str(), "icmp type");
+    }
+
+    #[test]
+    fn filter_dimension_display_name_maps_expected_labels() {
+        assert_eq!(FilterDimension::Host.display_name(), "Host");
+        assert_eq!(FilterDimension::Source.display_name(), "Source");
+        assert_eq!(FilterDimension::Destination.display_name(), "Destination");
+        assert_eq!(FilterDimension::Port.display_name(), "Port");
+        assert_eq!(FilterDimension::SourcePort.display_name(), "Src Port");
+        assert_eq!(FilterDimension::DestinationPort.display_name(), "Dst Port");
+        assert_eq!(FilterDimension::Protocol.display_name(), "Protocol");
+        assert_eq!(FilterDimension::TcpFlags.display_name(), "TCP Flags");
+        assert_eq!(FilterDimension::IpVersion.display_name(), "IP Version");
+        assert_eq!(
+            FilterDimension::TrafficClass.display_name(),
+            "Traffic Class"
+        );
+        assert_eq!(FilterDimension::IcmpType.display_name(), "ICMP Type");
     }
 
     #[test]
