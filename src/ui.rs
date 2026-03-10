@@ -560,6 +560,7 @@ fn render_date_time_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled(field_prefix, start_label_style),
             Span::styled(start_field_text, start_field_style),
         ]),
+        Line::raw(""),
         Line::from(vec![
             Span::styled("End:   ", end_label_style),
             Span::styled(end_field_text, end_field_style),
@@ -572,7 +573,7 @@ fn render_date_time_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(popup, inner);
 
     let (cursor_line_offset, cursor_col) = if active_field == Some(DateTimePopupField::End) {
-        (3_u16, end_cursor_col as u16)
+        (4_u16, end_cursor_col as u16)
     } else {
         (2_u16, start_cursor_col as u16)
     };
