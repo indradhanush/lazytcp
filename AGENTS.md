@@ -115,6 +115,14 @@ cargo run
 - Before each commit, ensure applicable `Verification Policy` commands have been run for the current changes.
 - If the tree is dirty, stage and commit the relevant finished slice before starting a new one.
 
+## Parallel Agent Workspace Rule (Required)
+
+- Multiple agents may work in parallel in the same repository.
+- Treat unrelated modified/untracked files as expected background activity, not as a blocker.
+- Do not revert or edit files owned by another active task unless explicitly asked.
+- Stage and commit only the files for the slice you implemented.
+- If another agent changed the same file you are actively editing, re-read the file, integrate carefully, and continue; ask Dhanush only when requirements conflict.
+
 ## Testing Guidance
 
 - Add unit tests in `src/domain.rs` for filter parsing/normalization and match behavior.
