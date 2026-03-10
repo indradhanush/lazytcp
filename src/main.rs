@@ -188,6 +188,25 @@ fn run_app(
 fn handle_event(app: &mut App) -> AppResult<()> {
     if let Event::Key(key) = event::read()? {
         if key.kind == KeyEventKind::Press {
+            if app.is_keybindings_popup_open() {
+                match key.code {
+                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        app.quit()
+                    }
+                    KeyCode::Char('q') => app.quit(),
+                    KeyCode::Esc | KeyCode::Enter | KeyCode::Char('?') => {
+                        app.close_keybindings_popup()
+                    }
+                    _ => {}
+                }
+                return Ok(());
+            }
+
+            if key.code == KeyCode::Char('?') {
+                app.open_keybindings_popup();
+                return Ok(());
+            }
+
             if app.is_filter_popup_open() {
                 match key.code {
                     KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {

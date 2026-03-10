@@ -1,0 +1,33 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Keybindings Popup
+:END:
+#+TITLE: lazytcp Keybindings Popup
+
+* Objective
+Add a keybindings popup that opens with =?= to make controls discoverable in-context.
+
+* Requested Behavior
+- Press =?= to show keybindings in a popup.
+
+* Scope
+In scope:
+- App state for keybindings popup visibility.
+- Event routing for open/close behavior.
+- Popup rendering with keybinding reference text.
+
+Out of scope:
+- Existing keybinding semantics (except discoverability UI).
+
+* Architecture Slice
+- =src/app.rs=
+  - Add keybindings popup visibility state + helpers.
+- =src/main.rs=
+  - Route =?= to open popup and handle close keys while popup is open.
+- =src/ui.rs=
+  - Render a centered keybindings popup overlay.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for keybindings popup slice.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.

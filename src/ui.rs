@@ -38,6 +38,7 @@ pub fn render(frame: &mut Frame, app: &App) {
     render_filter_bar(frame, app, root[2]);
     render_footer(frame, root[3]);
     render_filter_popup(frame, app, frame.area());
+    render_keybindings_popup(frame, app, frame.area());
 }
 
 fn render_header(frame: &mut Frame, app: &App, area: Rect) {
@@ -423,7 +424,7 @@ fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_footer(frame: &mut Frame, area: Rect) {
     let footer = Paragraph::new(
-        "q: quit | filter by pane: c clear selected category | enter: open popup | popup: space toggle, c clear category, C clear all, enter apply, esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
+        "q: quit | ?: keybindings | filter by pane: c clear selected category | enter: open popup | popup: space toggle, c clear category, C clear all, enter apply, esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
     );
     frame.render_widget(footer, area);
 }
@@ -482,6 +483,42 @@ fn render_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     frame.render_stateful_widget(list, popup_area, &mut state);
+}
+
+fn render_keybindings_popup(frame: &mut Frame, app: &App, area: Rect) {
+    if !app.is_keybindings_popup_open() {
+        return;
+    }
+
+    let popup_area = centered_rect(72, 68, area);
+    frame.render_widget(Clear, popup_area);
+
+    let lines = vec![
+        Line::raw("Global"),
+        Line::raw("  q / Ctrl-C: quit"),
+        Line::raw("  tab / shift+tab: cycle focus"),
+        Line::raw("  j/k or arrows: move selection"),
+        Line::raw("  ?: open keybindings"),
+        Line::raw("  C: clear all active filters"),
+        Line::raw(""),
+        Line::raw("Filter By Pane"),
+        Line::raw("  enter: open value picker popup"),
+        Line::raw("  c: clear selected filter category"),
+        Line::raw(""),
+        Line::raw("Filter Value Popup"),
+        Line::raw("  space: toggle selected value"),
+        Line::raw("  c: clear values in current category"),
+        Line::raw("  C: clear all active filters"),
+        Line::raw("  enter: apply selection"),
+        Line::raw("  esc: cancel popup"),
+        Line::raw(""),
+        Line::raw("Close This Help: esc / enter / ?"),
+    ];
+
+    let popup = Paragraph::new(lines)
+        .block(focused_block("Keybindings", true))
+        .wrap(Wrap { trim: true });
+    frame.render_widget(popup, popup_area);
 }
 
 fn focused_block(title: &str, is_focused: bool) -> Block<'_> {

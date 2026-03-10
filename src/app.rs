@@ -31,6 +31,7 @@ pub struct App {
     filter_expression: String,
     capture_state: CaptureState,
     filter_popup: Option<FilterPopup>,
+    keybindings_popup_open: bool,
 }
 
 impl App {
@@ -52,6 +53,7 @@ impl App {
             filter_expression: String::new(),
             capture_state: CaptureState::Idle,
             filter_popup: None,
+            keybindings_popup_open: false,
         };
         app.apply_active_filter();
         app
@@ -112,6 +114,18 @@ impl App {
 
     pub fn is_filter_popup_open(&self) -> bool {
         self.filter_popup.is_some()
+    }
+
+    pub fn is_keybindings_popup_open(&self) -> bool {
+        self.keybindings_popup_open
+    }
+
+    pub fn open_keybindings_popup(&mut self) {
+        self.keybindings_popup_open = true;
+    }
+
+    pub fn close_keybindings_popup(&mut self) {
+        self.keybindings_popup_open = false;
     }
 
     pub fn filter_popup_dimension(&self) -> Option<FilterDimension> {
@@ -594,6 +608,18 @@ mod tests {
 
         app.cycle_focus();
         assert_eq!(app.focus(), FocusPane::FilterSelector);
+    }
+
+    #[test]
+    fn keybindings_popup_open_and_close_updates_visibility_state() {
+        let mut app = App::new();
+        assert!(!app.is_keybindings_popup_open());
+
+        app.open_keybindings_popup();
+        assert!(app.is_keybindings_popup_open());
+
+        app.close_keybindings_popup();
+        assert!(!app.is_keybindings_popup_open());
     }
 
     #[test]
