@@ -538,7 +538,12 @@ fn render_date_time_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     let field_prefix = "Start: ";
-    let field_width = inner.width.saturating_sub(field_prefix.len() as u16) as usize;
+    let max_available_field_width = inner.width.saturating_sub(field_prefix.len() as u16) as usize;
+    let field_width = if max_available_field_width >= 26 {
+        max_available_field_width.min(32)
+    } else {
+        max_available_field_width
+    };
     let (start_field_text, start_cursor_col) = input_field_display(&start, field_width);
     let (end_field_text, end_cursor_col) = input_field_display(&end, field_width);
 
