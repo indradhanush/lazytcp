@@ -4,16 +4,20 @@ pub enum FilterDimension {
     Source,
     Destination,
     Port,
+    SourcePort,
+    DestinationPort,
     Protocol,
     TcpFlags,
 }
 
 impl FilterDimension {
-    pub const ALL: [FilterDimension; 6] = [
+    pub const ALL: [FilterDimension; 8] = [
         FilterDimension::Host,
         FilterDimension::Source,
         FilterDimension::Destination,
         FilterDimension::Port,
+        FilterDimension::SourcePort,
+        FilterDimension::DestinationPort,
         FilterDimension::Protocol,
         FilterDimension::TcpFlags,
     ];
@@ -24,6 +28,8 @@ impl FilterDimension {
             FilterDimension::Source => "source",
             FilterDimension::Destination => "destination",
             FilterDimension::Port => "port",
+            FilterDimension::SourcePort => "src port",
+            FilterDimension::DestinationPort => "dst port",
             FilterDimension::Protocol => "protocol",
             FilterDimension::TcpFlags => "tcp flags",
         }
@@ -204,6 +210,8 @@ mod tests {
                 FilterDimension::Source,
                 FilterDimension::Destination,
                 FilterDimension::Port,
+                FilterDimension::SourcePort,
+                FilterDimension::DestinationPort,
                 FilterDimension::Protocol,
                 FilterDimension::TcpFlags,
             ]
@@ -216,6 +224,8 @@ mod tests {
         assert_eq!(FilterDimension::Source.as_str(), "source");
         assert_eq!(FilterDimension::Destination.as_str(), "destination");
         assert_eq!(FilterDimension::Port.as_str(), "port");
+        assert_eq!(FilterDimension::SourcePort.as_str(), "src port");
+        assert_eq!(FilterDimension::DestinationPort.as_str(), "dst port");
         assert_eq!(FilterDimension::Protocol.as_str(), "protocol");
         assert_eq!(FilterDimension::TcpFlags.as_str(), "tcp flags");
     }

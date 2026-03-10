@@ -463,6 +463,16 @@ fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> V
                     candidates.insert(port.to_string());
                 }
             }
+            FilterDimension::SourcePort => {
+                if let Some(port) = endpoint_port(&packet.source) {
+                    candidates.insert(port.to_string());
+                }
+            }
+            FilterDimension::DestinationPort => {
+                if let Some(port) = endpoint_port(&packet.destination) {
+                    candidates.insert(port.to_string());
+                }
+            }
             FilterDimension::Protocol => {
                 candidates.insert(packet.protocol.to_ascii_lowercase());
             }
@@ -514,6 +524,12 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
         FilterDimension::Port => {
             endpoint_port(&packet.source).is_some_and(|port| port == query)
                 || endpoint_port(&packet.destination).is_some_and(|port| port == query)
+        }
+        FilterDimension::SourcePort => {
+            endpoint_port(&packet.source).is_some_and(|port| port == query)
+        }
+        FilterDimension::DestinationPort => {
+            endpoint_port(&packet.destination).is_some_and(|port| port == query)
         }
         FilterDimension::Protocol => packet.protocol.to_ascii_lowercase() == query,
         FilterDimension::TcpFlags => tcp_flags_from_summary(&packet.summary)
@@ -636,6 +652,17 @@ mod tests {
                 summary: "Flags [.], length 0".to_string(),
             },
         ]
+    }
+
+    fn select_filter_dimension(app: &mut App, target: FilterDimension) {
+        for _ in 0..app.filter_dimensions().len() {
+            if app.selected_filter_dimension() == target {
+                return;
+            }
+            app.next_filter_dimension();
+        }
+
+        panic!("failed to select filter dimension: {target:?}");
     }
 
     #[test]
@@ -821,9 +848,7 @@ mod tests {
     fn popup_supports_multi_select_and_expression_lists_selected_values() {
         let mut app = App::with_packets(sample_packets(), String::new());
 
-        for _ in 0..4 {
-            app.next_filter_dimension();
-        }
+        select_filter_dimension(&mut app, FilterDimension::Protocol);
         assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
 
         app.open_filter_popup();
@@ -842,12 +867,80 @@ mod tests {
     }
 
     #[test]
+    fn source_port_popup_lists_only_source_ports() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::SourcePort);
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::SourcePort);
+
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("source port popup should expose candidates");
+        assert_eq!(
+            candidates,
+            &[
+                "34211".to_string(),
+                "51544".to_string(),
+                "60000".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn destination_port_popup_lists_only_destination_ports() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::DestinationPort);
+        assert_eq!(
+            app.selected_filter_dimension(),
+            FilterDimension::DestinationPort
+        );
+
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("destination port popup should expose candidates");
+        assert_eq!(candidates, &["443".to_string(), "53".to_string()]);
+    }
+
+    #[test]
+    fn source_port_filter_matches_source_endpoint_only() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::SourcePort);
+        app.open_filter_popup();
+        app.move_down();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "src port = 51544");
+        assert_eq!(app.packets().len(), 1);
+        assert_eq!(app.packets()[0].source, "10.0.0.12.51544");
+    }
+
+    #[test]
+    fn destination_port_filter_matches_destination_endpoint_only() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::DestinationPort);
+        app.open_filter_popup();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "dst port = 443");
+        assert_eq!(app.packets().len(), 2);
+        assert!(app
+            .packets()
+            .iter()
+            .all(|packet| packet.destination.ends_with(".443")));
+    }
+
+    #[test]
     fn tcp_flags_popup_lists_unique_available_flags() {
         let mut app = App::with_packets(sample_packets(), String::new());
 
-        for _ in 0..5 {
-            app.next_filter_dimension();
-        }
+        select_filter_dimension(&mut app, FilterDimension::TcpFlags);
         assert_eq!(app.selected_filter_dimension(), FilterDimension::TcpFlags);
 
         app.open_filter_popup();
@@ -861,9 +954,7 @@ mod tests {
     fn tcp_flags_filter_matches_packets_by_selected_flag() {
         let mut app = App::with_packets(sample_packets(), String::new());
 
-        for _ in 0..5 {
-            app.next_filter_dimension();
-        }
+        select_filter_dimension(&mut app, FilterDimension::TcpFlags);
         assert_eq!(app.selected_filter_dimension(), FilterDimension::TcpFlags);
 
         app.open_filter_popup();
@@ -881,9 +972,7 @@ mod tests {
     fn popup_confirm_without_selections_clears_active_filter() {
         let mut app = App::with_packets(sample_packets(), String::new());
 
-        for _ in 0..4 {
-            app.next_filter_dimension();
-        }
+        select_filter_dimension(&mut app, FilterDimension::Protocol);
 
         app.open_filter_popup();
         app.move_down();
@@ -905,9 +994,7 @@ mod tests {
     fn popup_clear_selection_removes_all_checked_values_for_dimension() {
         let mut app = App::with_packets(sample_packets(), String::new());
 
-        for _ in 0..4 {
-            app.next_filter_dimension();
-        }
+        select_filter_dimension(&mut app, FilterDimension::Protocol);
         assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
 
         app.open_filter_popup();
@@ -948,9 +1035,7 @@ mod tests {
         assert_eq!(app.filter_expression(), "host = 1.1.1.1");
         assert_eq!(app.packets().len(), 2);
 
-        for _ in 0..4 {
-            app.next_filter_dimension();
-        }
+        select_filter_dimension(&mut app, FilterDimension::Protocol);
         assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
 
         app.open_filter_popup();
@@ -971,9 +1056,7 @@ mod tests {
         app.confirm_filter_popup();
         assert_eq!(app.filter_expression(), "host = 1.1.1.1");
 
-        for _ in 0..4 {
-            app.next_filter_dimension();
-        }
+        select_filter_dimension(&mut app, FilterDimension::Protocol);
         app.open_filter_popup();
         app.move_down();
         app.toggle_filter_popup_selection();
@@ -996,9 +1079,7 @@ mod tests {
         app.confirm_filter_popup();
         assert_eq!(app.filter_expression(), "host = 1.1.1.1");
 
-        for _ in 0..4 {
-            app.next_filter_dimension();
-        }
+        select_filter_dimension(&mut app, FilterDimension::Protocol);
         assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
 
         app.open_filter_popup();
@@ -1029,9 +1110,7 @@ mod tests {
         assert!(app.is_filter_dimension_active(FilterDimension::Host));
         assert!(!app.is_filter_dimension_active(FilterDimension::Protocol));
 
-        for _ in 0..4 {
-            app.next_filter_dimension();
-        }
+        select_filter_dimension(&mut app, FilterDimension::Protocol);
         assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
 
         app.open_filter_popup();

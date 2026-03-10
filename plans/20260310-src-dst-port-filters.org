@@ -1,0 +1,36 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Src/Dst Port Filters
+:END:
+#+TITLE: lazytcp Src/Dst Port Filters
+
+* Objective
+Add =src port= and =dst port= filter categories while retaining existing =port= (either direction).
+
+* Requested Behavior
+- =Filter By= includes =src port= and =dst port=.
+- Existing =port= behavior remains (matches source or destination port).
+- Popup candidates for each new category are derived from the respective endpoint direction.
+- Combined filters continue using AND semantics across categories.
+
+* Scope
+In scope:
+- Extend filter dimensions and labels.
+- Add candidate extraction and packet matching for source/destination port.
+- Update tests for new dimension order and port-specific behavior.
+
+Out of scope:
+- Capture backend changes.
+- Keybinding changes.
+
+* Architecture Slice
+- =src/domain.rs=
+  - Add =SourcePort= and =DestinationPort= to =FilterDimension=.
+- =src/app.rs=
+  - Implement direction-specific port candidates and matching.
+  - Add tests for popup candidates and filter expressions.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for src/dst port filter slice.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.
