@@ -1,0 +1,106 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Filter Popup Multiselect Plan
+:END:
+#+TITLE: lazytcp Filter Popup Multiselect Plan
+
+* Objective
+Implement a filter-value picker popup so pressing =Enter= on a filter type opens selectable filter values, supports multi-select with =Space=, and applies a composed filter expression on confirm.
+
+* Requested UX
+- Press =Enter= on selected filter type.
+- Open popup listing values for that filter dimension.
+- Toggle selections using =Space= with checkbox-style indicators.
+- Press =Enter= to confirm, close popup, and apply filters.
+- Show resulting expression in the filter expression pane.
+
+* Current Baseline (2026-03-10)
+- Filter type selection exists in left pane.
+- =Enter= from filter selector switches focus to free-form filter input.
+- Filtering uses a single text input value.
+- No popup or multi-select value model exists.
+
+* Scope
+In scope:
+- Add popup state and value candidates derived from loaded packets.
+- Support popup navigation and multi-select toggles.
+- Build and apply a deterministic filter expression from selected values.
+- Render popup and expression text without restarting capture/session.
+
+Out of scope:
+- Persisted filter presets/history.
+- Boolean expression editor beyond this popup selection slice.
+- Capture backend changes.
+
+* Architecture Slice
+- =src/domain.rs=
+  - Keep existing filter dimension contract; no structural expansion required.
+- =src/app.rs=
+  - Add popup lifecycle state and selected value set.
+  - Add candidate extraction by dimension (host/source/destination/port/protocol).
+  - Add confirm action that updates filter expression and visible packet set.
+- =src/ui.rs=
+  - Render popup overlay with checkbox list and active-row highlight.
+  - Keep existing panes visible beneath popup.
+  - Render composed expression in filter pane.
+- =src/main.rs=
+  - Route =Enter/Space/j/k/up/down/esc= to popup actions when open.
+  - Keep existing baseline keys stable outside popup.
+
+* Milestones
+** M1: App State and Filtering Semantics
+Deliverables:
+- Popup open/close state and selected row index.
+- Candidate list derivation and stable sorting.
+- Multi-select set and confirm/apply path.
+
+Acceptance criteria:
+- Popup opens from filter selector =Enter= and closes on confirm/cancel.
+- =Space= toggles current candidate without applying immediately.
+- Confirm updates expression and packet filtering deterministically.
+
+** M2: Popup Rendering
+Deliverables:
+- Centered popup block with filter-dimension title.
+- Checkbox list with selected marks and highlighted cursor row.
+- Footer hint text for popup controls.
+
+Acceptance criteria:
+- Popup is clearly visible and usable across typical terminal sizes.
+- Existing panes continue rendering correctly beneath overlay.
+
+** M3: Input Routing and Regression Tests
+Deliverables:
+- Event routing in main loop for popup-first key handling.
+- App tests for candidate extraction, toggle behavior, and expression application.
+- UI test adjustments for cursor behavior with expression display.
+
+Acceptance criteria:
+- Popup controls work with both vim keys and arrows.
+- Confirmed expression appears in filter expression pane.
+- Existing navigation/quit behavior remains stable outside popup.
+
+* Execution Order
+1. Implement popup state machine and candidate derivation in app logic.
+2. Add popup rendering and expression display updates.
+3. Wire key handling in main event loop for popup interactions.
+4. Add/adjust tests.
+5. Run =cargo fmt=, =cargo test=, and =cargo check=.
+
+* Risks and Mitigations
+- Risk: Host extraction could duplicate values with and without ports.
+  - Mitigation: Normalize endpoint-host extraction before candidate insertion.
+- Risk: Popup key handling could interfere with existing focus navigation.
+  - Mitigation: Gate all popup inputs behind explicit popup-open checks.
+- Risk: Narrow terminals clipping popup text.
+  - Mitigation: Clamp popup size to available area and keep concise labels.
+
+* Definition of Done
+- Popup multi-select workflow is functional for all filter dimensions.
+- Confirmed selections apply and are reflected in expression pane text.
+- Rust verification commands pass for the change set.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for popup-based multi-select filtering slice.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed (unit + contract tests).
+- 2026-03-10: =cargo check= passed.

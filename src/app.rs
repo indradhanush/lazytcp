@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::capture::CaptureState;
 use crate::domain::{FilterDimension, PacketSummary};
 
@@ -9,6 +11,14 @@ pub enum FocusPane {
     PacketDetail,
 }
 
+#[derive(Debug, Clone)]
+struct FilterPopup {
+    dimension: FilterDimension,
+    candidates: Vec<String>,
+    selected_values: BTreeSet<String>,
+    highlighted_index: usize,
+}
+
 pub struct App {
     should_quit: bool,
     focus: FocusPane,
@@ -17,8 +27,10 @@ pub struct App {
     selected_packet: usize,
     filter_dimensions: Vec<FilterDimension>,
     selected_filter_dimension: usize,
-    filter_input: String,
+    active_filter_values: Vec<String>,
+    filter_expression: String,
     capture_state: CaptureState,
+    filter_popup: Option<FilterPopup>,
 }
 
 impl App {
@@ -26,7 +38,7 @@ impl App {
         Self::with_packets(Vec::new(), String::new())
     }
 
-    pub fn with_packets(packets: Vec<PacketSummary>, filter_input: String) -> Self {
+    pub fn with_packets(packets: Vec<PacketSummary>, _filter_input: String) -> Self {
         let mut app = Self {
             should_quit: false,
             focus: FocusPane::FilterSelector,
@@ -35,8 +47,10 @@ impl App {
             selected_packet: 0,
             filter_dimensions: FilterDimension::ALL.to_vec(),
             selected_filter_dimension: 0,
-            filter_input,
+            active_filter_values: Vec::new(),
+            filter_expression: String::new(),
             capture_state: CaptureState::Idle,
+            filter_popup: None,
         };
         app.apply_active_filter();
         app
@@ -77,18 +91,92 @@ impl App {
             .unwrap_or(FilterDimension::Host)
     }
 
-    pub fn filter_input(&self) -> &str {
-        &self.filter_input
+    pub fn filter_expression(&self) -> &str {
+        &self.filter_expression
     }
 
-    pub fn insert_filter_input_char(&mut self, ch: char) {
-        self.filter_input.push(ch);
+    pub fn is_filter_popup_open(&self) -> bool {
+        self.filter_popup.is_some()
+    }
+
+    pub fn filter_popup_dimension(&self) -> Option<FilterDimension> {
+        self.filter_popup.as_ref().map(|popup| popup.dimension)
+    }
+
+    pub fn filter_popup_candidates(&self) -> Option<&[String]> {
+        self.filter_popup
+            .as_ref()
+            .map(|popup| popup.candidates.as_slice())
+    }
+
+    pub fn filter_popup_selected_index(&self) -> Option<usize> {
+        self.filter_popup
+            .as_ref()
+            .map(|popup| popup.highlighted_index)
+    }
+
+    pub fn filter_popup_candidate_selected(&self, index: usize) -> bool {
+        let Some(popup) = self.filter_popup.as_ref() else {
+            return false;
+        };
+
+        let Some(candidate) = popup.candidates.get(index) else {
+            return false;
+        };
+
+        popup.selected_values.contains(candidate)
+    }
+
+    pub fn open_filter_popup(&mut self) {
+        let dimension = self.selected_filter_dimension();
+        let candidates = filter_candidates(&self.all_packets, dimension);
+
+        let selected_values: BTreeSet<String> = self.active_filter_values.iter().cloned().collect();
+        let highlighted_index = candidates
+            .iter()
+            .position(|candidate| selected_values.contains(candidate))
+            .unwrap_or(0);
+
+        self.filter_popup = Some(FilterPopup {
+            dimension,
+            candidates,
+            selected_values,
+            highlighted_index,
+        });
+    }
+
+    pub fn close_filter_popup(&mut self) {
+        self.filter_popup = None;
+    }
+
+    pub fn confirm_filter_popup(&mut self) {
+        let Some(popup) = self.filter_popup.take() else {
+            return;
+        };
+
+        self.active_filter_values = popup
+            .candidates
+            .iter()
+            .filter(|candidate| popup.selected_values.contains(*candidate))
+            .cloned()
+            .collect();
+        self.filter_expression =
+            build_filter_expression(popup.dimension, &self.active_filter_values);
         self.apply_active_filter();
     }
 
-    pub fn backspace_filter_input(&mut self) {
-        self.filter_input.pop();
-        self.apply_active_filter();
+    pub fn toggle_filter_popup_selection(&mut self) {
+        let Some(popup) = self.filter_popup.as_mut() else {
+            return;
+        };
+
+        let Some(candidate) = popup.candidates.get(popup.highlighted_index).cloned() else {
+            return;
+        };
+
+        if !popup.selected_values.insert(candidate.clone()) {
+            popup.selected_values.remove(&candidate);
+        }
     }
 
     pub fn focus_filter_input(&mut self) {
@@ -133,18 +221,26 @@ impl App {
     }
 
     fn update_filter_dimension(&mut self, new_index: usize) {
-        let old_dimension = self.selected_filter_dimension();
-        self.selected_filter_dimension = new_index;
-        let new_dimension = self.selected_filter_dimension();
-
-        if !should_retain_filter_input(old_dimension, new_dimension) {
-            self.filter_input.clear();
+        if self.selected_filter_dimension == new_index {
+            return;
         }
 
+        self.selected_filter_dimension = new_index;
+        self.active_filter_values.clear();
+        self.filter_expression.clear();
+        self.filter_popup = None;
         self.apply_active_filter();
     }
 
     pub fn move_down(&mut self) {
+        if let Some(popup) = self.filter_popup.as_mut() {
+            if popup.candidates.is_empty() {
+                return;
+            }
+            popup.highlighted_index = (popup.highlighted_index + 1).min(popup.candidates.len() - 1);
+            return;
+        }
+
         match self.focus {
             FocusPane::FilterSelector => self.next_filter_dimension(),
             FocusPane::PacketList => self.next_packet(),
@@ -153,6 +249,11 @@ impl App {
     }
 
     pub fn move_up(&mut self) {
+        if let Some(popup) = self.filter_popup.as_mut() {
+            popup.highlighted_index = popup.highlighted_index.saturating_sub(1);
+            return;
+        }
+
         match self.focus {
             FocusPane::FilterSelector => self.previous_filter_dimension(),
             FocusPane::PacketList => self.previous_packet(),
@@ -161,6 +262,10 @@ impl App {
     }
 
     pub fn cycle_focus(&mut self) {
+        if self.filter_popup.is_some() {
+            return;
+        }
+
         self.focus = match self.focus {
             FocusPane::FilterSelector => FocusPane::PacketList,
             FocusPane::PacketList => FocusPane::PacketDetail,
@@ -170,6 +275,10 @@ impl App {
     }
 
     pub fn reverse_cycle_focus(&mut self) {
+        if self.filter_popup.is_some() {
+            return;
+        }
+
         self.focus = match self.focus {
             FocusPane::FilterSelector => FocusPane::PacketDetail,
             FocusPane::FilterInput => FocusPane::FilterSelector,
@@ -179,9 +288,7 @@ impl App {
     }
 
     fn apply_active_filter(&mut self) {
-        let query = self.filter_input.trim().to_ascii_lowercase();
-
-        if query.is_empty() {
+        if self.active_filter_values.is_empty() {
             self.packets = self.all_packets.clone();
             self.clamp_selected_packet();
             return;
@@ -191,7 +298,9 @@ impl App {
         self.packets = self
             .all_packets
             .iter()
-            .filter(|packet| packet_matches_filter(packet, dimension, &query))
+            .filter(|packet| {
+                packet_matches_any_value(packet, dimension, &self.active_filter_values)
+            })
             .cloned()
             .collect();
         self.clamp_selected_packet();
@@ -207,21 +316,74 @@ impl App {
     }
 }
 
-fn packet_matches_filter(packet: &PacketSummary, dimension: FilterDimension, query: &str) -> bool {
+fn build_filter_expression(dimension: FilterDimension, values: &[String]) -> String {
+    if values.is_empty() {
+        return String::new();
+    }
+
+    if values.len() == 1 {
+        return format!("{} = {}", dimension.as_str(), values[0]);
+    }
+
+    format!("{} in [{}]", dimension.as_str(), values.join(", "))
+}
+
+fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> Vec<String> {
+    let mut candidates = BTreeSet::new();
+
+    for packet in packets {
+        match dimension {
+            FilterDimension::Host => {
+                candidates.insert(endpoint_host(&packet.source));
+                candidates.insert(endpoint_host(&packet.destination));
+            }
+            FilterDimension::Source => {
+                candidates.insert(endpoint_host(&packet.source));
+            }
+            FilterDimension::Destination => {
+                candidates.insert(endpoint_host(&packet.destination));
+            }
+            FilterDimension::Port => {
+                if let Some(port) = endpoint_port(&packet.source) {
+                    candidates.insert(port.to_string());
+                }
+                if let Some(port) = endpoint_port(&packet.destination) {
+                    candidates.insert(port.to_string());
+                }
+            }
+            FilterDimension::Protocol => {
+                candidates.insert(packet.protocol.to_ascii_lowercase());
+            }
+        }
+    }
+
+    candidates.into_iter().collect()
+}
+
+fn packet_matches_any_value(
+    packet: &PacketSummary,
+    dimension: FilterDimension,
+    values: &[String],
+) -> bool {
+    values
+        .iter()
+        .any(|value| packet_matches_value(packet, dimension, value))
+}
+
+fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, value: &str) -> bool {
+    let query = value.trim().to_ascii_lowercase();
+
     match dimension {
         FilterDimension::Host => {
-            endpoint_host(&packet.source).contains(query)
-                || endpoint_host(&packet.destination).contains(query)
-                || packet.source.to_ascii_lowercase().contains(query)
-                || packet.destination.to_ascii_lowercase().contains(query)
+            endpoint_host(&packet.source) == query || endpoint_host(&packet.destination) == query
         }
-        FilterDimension::Source => packet.source.to_ascii_lowercase().contains(query),
-        FilterDimension::Destination => packet.destination.to_ascii_lowercase().contains(query),
+        FilterDimension::Source => endpoint_host(&packet.source) == query,
+        FilterDimension::Destination => endpoint_host(&packet.destination) == query,
         FilterDimension::Port => {
-            endpoint_port(&packet.source).is_some_and(|port| port.contains(query))
-                || endpoint_port(&packet.destination).is_some_and(|port| port.contains(query))
+            endpoint_port(&packet.source).is_some_and(|port| port == query)
+                || endpoint_port(&packet.destination).is_some_and(|port| port == query)
         }
-        FilterDimension::Protocol => packet.protocol.to_ascii_lowercase().contains(query),
+        FilterDimension::Protocol => packet.protocol.to_ascii_lowercase() == query,
     }
 }
 
@@ -234,26 +396,12 @@ fn endpoint_host(endpoint: &str) -> String {
     endpoint.to_ascii_lowercase()
 }
 
-fn endpoint_port(endpoint: &str) -> Option<&str> {
+fn endpoint_port(endpoint: &str) -> Option<String> {
     let (host, port) = endpoint.rsplit_once('.')?;
     if !host.is_empty() && port.chars().all(|ch| ch.is_ascii_digit()) {
-        return Some(port);
+        return Some(port.to_string());
     }
     None
-}
-
-fn should_retain_filter_input(
-    old_dimension: FilterDimension,
-    new_dimension: FilterDimension,
-) -> bool {
-    is_endpoint_dimension(old_dimension) && is_endpoint_dimension(new_dimension)
-}
-
-fn is_endpoint_dimension(dimension: FilterDimension) -> bool {
-    matches!(
-        dimension,
-        FilterDimension::Host | FilterDimension::Source | FilterDimension::Destination
-    )
 }
 
 impl Default for App {
@@ -285,6 +433,14 @@ mod tests {
                 protocol: "UDP".to_string(),
                 length: 0,
                 summary: "UDP, length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                source: "192.168.1.5.60000".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 0,
+                summary: "Flags [.], length 0".to_string(),
             },
         ]
     }
@@ -355,34 +511,6 @@ mod tests {
     }
 
     #[test]
-    fn insert_filter_input_char_appends_text() {
-        let mut app = App::new();
-        app.insert_filter_input_char('u');
-        app.insert_filter_input_char('d');
-        app.insert_filter_input_char('p');
-
-        assert_eq!(app.filter_input(), "udp");
-    }
-
-    #[test]
-    fn backspace_filter_input_removes_last_character() {
-        let mut app = App::with_packets(Vec::new(), "tcp".to_string());
-        app.backspace_filter_input();
-
-        assert_eq!(app.filter_input(), "tc");
-    }
-
-    #[test]
-    fn focus_packet_list_sets_packet_focus() {
-        let mut app = App::new();
-        app.focus_filter_input();
-        assert_eq!(app.focus(), FocusPane::FilterInput);
-
-        app.focus_packet_list();
-        assert_eq!(app.focus(), FocusPane::PacketList);
-    }
-
-    #[test]
     fn move_down_in_packet_list_focus_advances_packet_selection() {
         let mut app = App::with_packets(sample_packets(), String::new());
         app.cycle_focus();
@@ -419,109 +547,108 @@ mod tests {
     }
 
     #[test]
-    fn cycle_focus_from_filter_input_returns_to_packet_list() {
-        let mut app = App::new();
-        app.focus_filter_input();
-        assert_eq!(app.focus(), FocusPane::FilterInput);
-
-        app.cycle_focus();
-        assert_eq!(app.focus(), FocusPane::PacketList);
-    }
-
-    #[test]
-    fn reverse_cycle_focus_from_filter_input_returns_to_filter_selector() {
-        let mut app = App::new();
-        app.focus_filter_input();
-        assert_eq!(app.focus(), FocusPane::FilterInput);
-
-        app.reverse_cycle_focus();
-        assert_eq!(app.focus(), FocusPane::FilterSelector);
-    }
-
-    #[test]
-    fn protocol_filter_input_reduces_visible_packets() {
+    fn opening_host_popup_lists_unique_hosts() {
         let mut app = App::with_packets(sample_packets(), String::new());
-        assert_eq!(app.packets().len(), 2);
 
-        for _ in 0..4 {
-            app.next_filter_dimension();
-        }
-        assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
+        app.open_filter_popup();
 
-        app.insert_filter_input_char('u');
-        app.insert_filter_input_char('d');
-        app.insert_filter_input_char('p');
-
-        assert_eq!(app.packets().len(), 1);
-        assert_eq!(app.packets()[0].protocol, "UDP");
-    }
-
-    #[test]
-    fn changing_filter_dimension_reapplies_existing_query() {
-        let mut app = App::with_packets(sample_packets(), "8.8.8.8".to_string());
-        assert_eq!(app.selected_filter_dimension(), FilterDimension::Host);
-        assert_eq!(app.packets().len(), 1);
-
-        app.next_filter_dimension();
-        assert_eq!(app.selected_filter_dimension(), FilterDimension::Source);
-        assert_eq!(app.filter_input(), "8.8.8.8");
-        assert_eq!(app.packets().len(), 0);
-    }
-
-    #[test]
-    fn changing_dimension_to_port_clears_existing_filter_input() {
-        let mut app = App::with_packets(sample_packets(), "8.8.8.8".to_string());
-        assert_eq!(app.selected_filter_dimension(), FilterDimension::Host);
-
-        app.next_filter_dimension();
-        app.next_filter_dimension();
-        app.next_filter_dimension();
-
-        assert_eq!(app.selected_filter_dimension(), FilterDimension::Port);
-        assert_eq!(app.filter_input(), "");
-        assert_eq!(app.packets().len(), 2);
-    }
-
-    #[test]
-    fn changing_dimension_from_port_clears_existing_filter_input() {
-        let mut app = App::with_packets(sample_packets(), String::new());
-        app.next_filter_dimension();
-        app.next_filter_dimension();
-        app.next_filter_dimension();
-        assert_eq!(app.selected_filter_dimension(), FilterDimension::Port);
-
-        app.insert_filter_input_char('4');
-        app.insert_filter_input_char('4');
-        app.insert_filter_input_char('3');
-        assert_eq!(app.filter_input(), "443");
-        assert_eq!(app.packets().len(), 1);
-
-        app.previous_filter_dimension();
+        assert!(app.is_filter_popup_open());
+        assert_eq!(app.filter_popup_dimension(), Some(FilterDimension::Host));
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("host popup should expose candidates");
         assert_eq!(
-            app.selected_filter_dimension(),
-            FilterDimension::Destination
+            candidates,
+            &[
+                "1.1.1.1".to_string(),
+                "10.0.0.12".to_string(),
+                "192.168.1.5".to_string(),
+                "8.8.8.8".to_string(),
+            ]
         );
-        assert_eq!(app.filter_input(), "");
-        assert_eq!(app.packets().len(), 2);
     }
 
     #[test]
-    fn changing_dimension_from_protocol_clears_existing_filter_input() {
+    fn popup_selection_with_space_and_enter_applies_filter_expression() {
         let mut app = App::with_packets(sample_packets(), String::new());
+
+        app.open_filter_popup();
+        app.move_down();
+        app.move_down();
+        app.move_down();
+        assert_eq!(app.filter_popup_selected_index(), Some(3));
+
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert!(!app.is_filter_popup_open());
+        assert_eq!(app.filter_expression(), "host = 8.8.8.8");
+        assert_eq!(app.packets().len(), 1);
+        assert_eq!(app.packets()[0].destination, "8.8.8.8.53");
+    }
+
+    #[test]
+    fn popup_supports_multi_select_and_expression_lists_selected_values() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
         for _ in 0..4 {
             app.next_filter_dimension();
         }
         assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
 
-        app.insert_filter_input_char('u');
-        app.insert_filter_input_char('d');
-        app.insert_filter_input_char('p');
-        assert_eq!(app.filter_input(), "udp");
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("protocol popup should expose candidates");
+        assert_eq!(candidates, &["tcp".to_string(), "udp".to_string()]);
+
+        app.toggle_filter_popup_selection();
+        app.move_down();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "protocol in [tcp, udp]");
+        assert_eq!(app.packets().len(), 3);
+    }
+
+    #[test]
+    fn popup_confirm_without_selections_clears_active_filter() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        for _ in 0..4 {
+            app.next_filter_dimension();
+        }
+
+        app.open_filter_popup();
+        app.move_down();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "protocol = udp");
         assert_eq!(app.packets().len(), 1);
 
-        app.previous_filter_dimension();
-        assert_eq!(app.selected_filter_dimension(), FilterDimension::Port);
-        assert_eq!(app.filter_input(), "");
+        app.open_filter_popup();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "");
+        assert_eq!(app.packets().len(), 3);
+    }
+
+    #[test]
+    fn changing_filter_dimension_clears_applied_values() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        app.open_filter_popup();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1");
         assert_eq!(app.packets().len(), 2);
+
+        app.next_filter_dimension();
+
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Source);
+        assert_eq!(app.filter_expression(), "");
+        assert_eq!(app.packets().len(), 3);
     }
 }

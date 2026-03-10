@@ -188,17 +188,27 @@ fn run_app(
 fn handle_event(app: &mut App) -> AppResult<()> {
     if let Event::Key(key) = event::read()? {
         if key.kind == KeyEventKind::Press {
+            if app.is_filter_popup_open() {
+                match key.code {
+                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        app.quit()
+                    }
+                    KeyCode::Char('q') => app.quit(),
+                    KeyCode::Char('j') | KeyCode::Down => app.move_down(),
+                    KeyCode::Char('k') | KeyCode::Up => app.move_up(),
+                    KeyCode::Char(' ') => app.toggle_filter_popup_selection(),
+                    KeyCode::Enter => app.confirm_filter_popup(),
+                    KeyCode::Esc => app.close_filter_popup(),
+                    _ => {}
+                }
+                return Ok(());
+            }
+
             match key.code {
                 KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => app.quit(),
-                KeyCode::Char(ch) if app.focus() == FocusPane::FilterInput => {
-                    app.insert_filter_input_char(ch)
-                }
-                KeyCode::Backspace if app.focus() == FocusPane::FilterInput => {
-                    app.backspace_filter_input()
-                }
                 KeyCode::Enter if app.focus() == FocusPane::FilterInput => app.focus_packet_list(),
                 KeyCode::Enter if app.focus() == FocusPane::FilterSelector => {
-                    app.focus_filter_input()
+                    app.open_filter_popup()
                 }
                 KeyCode::Char('q') => app.quit(),
                 KeyCode::Char('j') | KeyCode::Down => app.move_down(),
