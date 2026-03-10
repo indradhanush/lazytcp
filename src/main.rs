@@ -198,6 +198,7 @@ fn handle_event(app: &mut App) -> AppResult<()> {
                     KeyCode::Char('k') | KeyCode::Up => app.move_up(),
                     KeyCode::Char(' ') => app.toggle_filter_popup_selection(),
                     KeyCode::Char('c') => app.clear_filter_popup_selection(),
+                    KeyCode::Char('C') => app.clear_all_filters(),
                     KeyCode::Enter => app.confirm_filter_popup(),
                     _ if is_popup_cancel_key(key.code, key.modifiers) => app.close_filter_popup(),
                     _ => {}
@@ -212,6 +213,7 @@ fn handle_event(app: &mut App) -> AppResult<()> {
                     app.open_filter_popup()
                 }
                 KeyCode::Char('q') => app.quit(),
+                KeyCode::Char('C') => app.clear_all_filters(),
                 KeyCode::Char('j') | KeyCode::Down => app.move_down(),
                 KeyCode::Char('k') | KeyCode::Up => app.move_up(),
                 KeyCode::Tab => app.cycle_focus(),

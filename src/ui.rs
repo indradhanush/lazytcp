@@ -349,7 +349,7 @@ fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_footer(frame: &mut Frame, area: Rect) {
     let footer = Paragraph::new(
-        "q: quit | enter on filter by pane: open popup | popup: space toggle, c clear, enter apply, esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
+        "q: quit | enter on filter by pane: open popup | popup: space toggle, c clear category, C clear all, enter apply, esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
     );
     frame.render_widget(footer, area);
 }
@@ -388,8 +388,10 @@ fn render_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let popup_title = format!("Select {} values", dimension);
-    let popup_footer = Line::raw("space: toggle | c: clear all | enter: apply | esc: cancel")
-        .alignment(Alignment::Right);
+    let popup_footer = Line::raw(
+        "space: toggle | c: clear category | C: clear all filters | enter: apply | esc: cancel",
+    )
+    .alignment(Alignment::Right);
     let list = List::new(items)
         .block(focused_block(&popup_title, true).title_bottom(popup_footer))
         .highlight_style(

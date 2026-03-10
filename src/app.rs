@@ -195,6 +195,19 @@ impl App {
         popup.selected_values.clear();
     }
 
+    pub fn clear_all_filters(&mut self) {
+        for values in &mut self.active_filter_values_by_dimension {
+            values.clear();
+        }
+        self.filter_expression.clear();
+
+        if let Some(popup) = self.filter_popup.as_mut() {
+            popup.selected_values.clear();
+        }
+
+        self.apply_active_filter();
+    }
+
     pub fn focus_filter_input(&mut self) {
         self.focus = FocusPane::FilterInput;
     }
@@ -786,5 +799,30 @@ mod tests {
 
         assert_eq!(app.filter_expression(), "host = 1.1.1.1 and protocol = udp");
         assert_eq!(app.packets().len(), 0);
+    }
+
+    #[test]
+    fn clear_all_filters_resets_all_categories() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        app.open_filter_popup();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1");
+
+        for _ in 0..4 {
+            app.next_filter_dimension();
+        }
+        app.open_filter_popup();
+        app.move_down();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1 and protocol = udp");
+        assert_eq!(app.packets().len(), 0);
+
+        app.clear_all_filters();
+
+        assert_eq!(app.filter_expression(), "");
+        assert_eq!(app.packets().len(), 3);
     }
 }
