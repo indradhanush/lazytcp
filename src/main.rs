@@ -198,7 +198,7 @@ fn handle_event(app: &mut App) -> AppResult<()> {
                     KeyCode::Char('k') | KeyCode::Up => app.move_up(),
                     KeyCode::Char(' ') => app.toggle_filter_popup_selection(),
                     KeyCode::Enter => app.confirm_filter_popup(),
-                    KeyCode::Esc => app.close_filter_popup(),
+                    _ if is_popup_cancel_key(key.code, key.modifiers) => app.close_filter_popup(),
                     _ => {}
                 }
                 return Ok(());
@@ -223,9 +223,16 @@ fn handle_event(app: &mut App) -> AppResult<()> {
     Ok(())
 }
 
+fn is_popup_cancel_key(code: KeyCode, modifiers: KeyModifiers) -> bool {
+    matches!(code, KeyCode::Esc | KeyCode::Char('\u{1b}'))
+        || (matches!(code, KeyCode::Char('[')) && modifiers.contains(KeyModifiers::CONTROL))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_args_from, CliError, ParsedArgs};
+    use crossterm::event::{KeyCode, KeyModifiers};
+
+    use super::{is_popup_cancel_key, parse_args_from, CliError, ParsedArgs};
 
     #[test]
     fn missing_pcap_argument_returns_usage_error() {
@@ -243,5 +250,19 @@ mod tests {
     fn help_flag_returns_help_variant() {
         let result = parse_args_from(vec!["--help".to_string()]).expect("help should parse");
         assert!(matches!(result, ParsedArgs::Help));
+    }
+
+    #[test]
+    fn popup_cancel_key_matches_escape_variants() {
+        assert!(is_popup_cancel_key(KeyCode::Esc, KeyModifiers::NONE));
+        assert!(is_popup_cancel_key(
+            KeyCode::Char('\u{1b}'),
+            KeyModifiers::NONE
+        ));
+        assert!(is_popup_cancel_key(
+            KeyCode::Char('['),
+            KeyModifiers::CONTROL
+        ));
+        assert!(!is_popup_cancel_key(KeyCode::Char('['), KeyModifiers::NONE));
     }
 }
