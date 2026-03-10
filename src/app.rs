@@ -11,12 +11,30 @@ pub enum FocusPane {
     PacketDetail,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DateTimePopupField {
+    Start,
+    End,
+}
+
+#[derive(Debug, Clone)]
+enum FilterPopupState {
+    MultiSelect {
+        candidates: Vec<String>,
+        selected_values: BTreeSet<String>,
+        highlighted_index: usize,
+    },
+    DateTimeRange {
+        start_input: String,
+        end_input: String,
+        active_field: DateTimePopupField,
+    },
+}
+
 #[derive(Debug, Clone)]
 struct FilterPopup {
     dimension: FilterDimension,
-    candidates: Vec<String>,
-    selected_values: BTreeSet<String>,
-    highlighted_index: usize,
+    state: FilterPopupState,
 }
 
 pub struct App {
@@ -132,16 +150,28 @@ impl App {
         self.filter_popup.as_ref().map(|popup| popup.dimension)
     }
 
-    pub fn filter_popup_candidates(&self) -> Option<&[String]> {
+    pub fn is_filter_popup_date_time(&self) -> bool {
         self.filter_popup
             .as_ref()
-            .map(|popup| popup.candidates.as_slice())
+            .is_some_and(|popup| popup.dimension == FilterDimension::DateTime)
+    }
+
+    pub fn filter_popup_candidates(&self) -> Option<&[String]> {
+        let popup = self.filter_popup.as_ref()?;
+        match &popup.state {
+            FilterPopupState::MultiSelect { candidates, .. } => Some(candidates.as_slice()),
+            FilterPopupState::DateTimeRange { .. } => None,
+        }
     }
 
     pub fn filter_popup_selected_index(&self) -> Option<usize> {
-        self.filter_popup
-            .as_ref()
-            .map(|popup| popup.highlighted_index)
+        let popup = self.filter_popup.as_ref()?;
+        match popup.state {
+            FilterPopupState::MultiSelect {
+                highlighted_index, ..
+            } => Some(highlighted_index),
+            FilterPopupState::DateTimeRange { .. } => None,
+        }
     }
 
     pub fn filter_popup_candidate_selected(&self, index: usize) -> bool {
@@ -149,32 +179,83 @@ impl App {
             return false;
         };
 
-        let Some(candidate) = popup.candidates.get(index) else {
+        let FilterPopupState::MultiSelect {
+            candidates,
+            selected_values,
+            ..
+        } = &popup.state
+        else {
             return false;
         };
 
-        popup.selected_values.contains(candidate)
+        let Some(candidate) = candidates.get(index) else {
+            return false;
+        };
+
+        selected_values.contains(candidate)
+    }
+
+    pub fn filter_popup_date_time_start_input(&self) -> Option<&str> {
+        let popup = self.filter_popup.as_ref()?;
+        let FilterPopupState::DateTimeRange { start_input, .. } = &popup.state else {
+            return None;
+        };
+        Some(start_input.as_str())
+    }
+
+    pub fn filter_popup_date_time_end_input(&self) -> Option<&str> {
+        let popup = self.filter_popup.as_ref()?;
+        let FilterPopupState::DateTimeRange { end_input, .. } = &popup.state else {
+            return None;
+        };
+        Some(end_input.as_str())
+    }
+
+    pub fn filter_popup_date_time_active_field(&self) -> Option<DateTimePopupField> {
+        let popup = self.filter_popup.as_ref()?;
+        let FilterPopupState::DateTimeRange { active_field, .. } = popup.state else {
+            return None;
+        };
+        Some(active_field)
     }
 
     pub fn open_filter_popup(&mut self) {
         let dimension = self.selected_filter_dimension();
-        let candidates = filter_candidates(&self.all_packets, dimension);
+        self.filter_popup = Some(match dimension {
+            FilterDimension::DateTime => {
+                let range = decode_date_time_range_filter_values(
+                    self.active_filter_values_for_selected_dimension(),
+                );
+                FilterPopup {
+                    dimension,
+                    state: FilterPopupState::DateTimeRange {
+                        start_input: range.start.unwrap_or_default(),
+                        end_input: range.end.unwrap_or_default(),
+                        active_field: DateTimePopupField::Start,
+                    },
+                }
+            }
+            _ => {
+                let candidates = filter_candidates(&self.all_packets, dimension);
+                let selected_values: BTreeSet<String> = self
+                    .active_filter_values_for_selected_dimension()
+                    .iter()
+                    .cloned()
+                    .collect();
+                let highlighted_index = candidates
+                    .iter()
+                    .position(|candidate| selected_values.contains(candidate))
+                    .unwrap_or(0);
 
-        let selected_values: BTreeSet<String> = self
-            .active_filter_values_for_selected_dimension()
-            .iter()
-            .cloned()
-            .collect();
-        let highlighted_index = candidates
-            .iter()
-            .position(|candidate| selected_values.contains(candidate))
-            .unwrap_or(0);
-
-        self.filter_popup = Some(FilterPopup {
-            dimension,
-            candidates,
-            selected_values,
-            highlighted_index,
+                FilterPopup {
+                    dimension,
+                    state: FilterPopupState::MultiSelect {
+                        candidates,
+                        selected_values,
+                        highlighted_index,
+                    },
+                }
+            }
         });
     }
 
@@ -187,12 +268,25 @@ impl App {
             return;
         };
 
-        let selected_values: Vec<String> = popup
-            .candidates
-            .iter()
-            .filter(|candidate| popup.selected_values.contains(*candidate))
-            .cloned()
-            .collect();
+        let selected_values = match popup.state {
+            FilterPopupState::MultiSelect {
+                candidates,
+                selected_values,
+                ..
+            } => candidates
+                .iter()
+                .filter(|candidate| selected_values.contains(*candidate))
+                .cloned()
+                .collect(),
+            FilterPopupState::DateTimeRange {
+                start_input,
+                end_input,
+                ..
+            } => encode_date_time_range_filter_values(
+                normalize_date_time_popup_input(&start_input),
+                normalize_date_time_popup_input(&end_input),
+            ),
+        };
         self.set_active_filter_values(popup.dimension, selected_values);
         self.filter_expression = build_filter_expression(
             &self.filter_dimensions,
@@ -206,12 +300,21 @@ impl App {
             return;
         };
 
-        let Some(candidate) = popup.candidates.get(popup.highlighted_index).cloned() else {
+        let FilterPopupState::MultiSelect {
+            candidates,
+            selected_values,
+            highlighted_index,
+        } = &mut popup.state
+        else {
             return;
         };
 
-        if !popup.selected_values.insert(candidate.clone()) {
-            popup.selected_values.remove(&candidate);
+        let Some(candidate) = candidates.get(*highlighted_index).cloned() else {
+            return;
+        };
+
+        if !selected_values.insert(candidate.clone()) {
+            selected_values.remove(&candidate);
         }
     }
 
@@ -220,7 +323,78 @@ impl App {
             return;
         };
 
-        popup.selected_values.clear();
+        match &mut popup.state {
+            FilterPopupState::MultiSelect {
+                selected_values, ..
+            } => selected_values.clear(),
+            FilterPopupState::DateTimeRange {
+                start_input,
+                end_input,
+                ..
+            } => {
+                start_input.clear();
+                end_input.clear();
+            }
+        }
+    }
+
+    pub fn filter_popup_switch_date_time_field(&mut self) {
+        let Some(popup) = self.filter_popup.as_mut() else {
+            return;
+        };
+        let FilterPopupState::DateTimeRange { active_field, .. } = &mut popup.state else {
+            return;
+        };
+        *active_field = match active_field {
+            DateTimePopupField::Start => DateTimePopupField::End,
+            DateTimePopupField::End => DateTimePopupField::Start,
+        };
+    }
+
+    pub fn filter_popup_insert_char(&mut self, ch: char) {
+        let Some(popup) = self.filter_popup.as_mut() else {
+            return;
+        };
+        let FilterPopupState::DateTimeRange {
+            start_input,
+            end_input,
+            active_field,
+        } = &mut popup.state
+        else {
+            return;
+        };
+
+        if !is_allowed_date_time_char(ch) {
+            return;
+        }
+
+        match active_field {
+            DateTimePopupField::Start => start_input.push(ch),
+            DateTimePopupField::End => end_input.push(ch),
+        }
+    }
+
+    pub fn filter_popup_backspace(&mut self) {
+        let Some(popup) = self.filter_popup.as_mut() else {
+            return;
+        };
+        let FilterPopupState::DateTimeRange {
+            start_input,
+            end_input,
+            active_field,
+        } = &mut popup.state
+        else {
+            return;
+        };
+
+        match active_field {
+            DateTimePopupField::Start => {
+                start_input.pop();
+            }
+            DateTimePopupField::End => {
+                end_input.pop();
+            }
+        }
     }
 
     pub fn clear_all_filters(&mut self) {
@@ -230,7 +404,19 @@ impl App {
         self.filter_expression.clear();
 
         if let Some(popup) = self.filter_popup.as_mut() {
-            popup.selected_values.clear();
+            match &mut popup.state {
+                FilterPopupState::MultiSelect {
+                    selected_values, ..
+                } => selected_values.clear(),
+                FilterPopupState::DateTimeRange {
+                    start_input,
+                    end_input,
+                    ..
+                } => {
+                    start_input.clear();
+                    end_input.clear();
+                }
+            }
         }
 
         self.apply_active_filter();
@@ -245,7 +431,19 @@ impl App {
         }
 
         if let Some(popup) = self.filter_popup.as_mut() {
-            popup.selected_values.clear();
+            match &mut popup.state {
+                FilterPopupState::MultiSelect {
+                    selected_values, ..
+                } => selected_values.clear(),
+                FilterPopupState::DateTimeRange {
+                    start_input,
+                    end_input,
+                    ..
+                } => {
+                    start_input.clear();
+                    end_input.clear();
+                }
+            }
         }
 
         self.filter_expression = build_filter_expression(
@@ -307,10 +505,21 @@ impl App {
 
     pub fn move_down(&mut self) {
         if let Some(popup) = self.filter_popup.as_mut() {
-            if popup.candidates.is_empty() {
-                return;
+            match &mut popup.state {
+                FilterPopupState::MultiSelect {
+                    candidates,
+                    highlighted_index,
+                    ..
+                } => {
+                    if candidates.is_empty() {
+                        return;
+                    }
+                    *highlighted_index = (*highlighted_index + 1) % candidates.len();
+                }
+                FilterPopupState::DateTimeRange { active_field, .. } => {
+                    *active_field = DateTimePopupField::End;
+                }
             }
-            popup.highlighted_index = (popup.highlighted_index + 1) % popup.candidates.len();
             return;
         }
 
@@ -323,14 +532,25 @@ impl App {
 
     pub fn move_up(&mut self) {
         if let Some(popup) = self.filter_popup.as_mut() {
-            if popup.candidates.is_empty() {
-                return;
+            match &mut popup.state {
+                FilterPopupState::MultiSelect {
+                    candidates,
+                    highlighted_index,
+                    ..
+                } => {
+                    if candidates.is_empty() {
+                        return;
+                    }
+                    *highlighted_index = if *highlighted_index == 0 {
+                        candidates.len() - 1
+                    } else {
+                        *highlighted_index - 1
+                    };
+                }
+                FilterPopupState::DateTimeRange { active_field, .. } => {
+                    *active_field = DateTimePopupField::Start;
+                }
             }
-            popup.highlighted_index = if popup.highlighted_index == 0 {
-                popup.candidates.len() - 1
-            } else {
-                popup.highlighted_index - 1
-            };
             return;
         }
 
@@ -430,6 +650,13 @@ fn build_filter_expression(
             continue;
         }
 
+        if *dimension == FilterDimension::DateTime {
+            if let Some(clause) = build_date_time_filter_clause(values) {
+                clauses.push(clause);
+            }
+            continue;
+        }
+
         if values.len() == 1 {
             clauses.push(format!("{} = {}", dimension.as_str(), values[0]));
         } else {
@@ -438,6 +665,86 @@ fn build_filter_expression(
     }
 
     clauses.join(" and ")
+}
+
+#[derive(Debug, Default, Clone)]
+struct DateTimeRangeFilterValues {
+    start: Option<String>,
+    end: Option<String>,
+}
+
+fn normalize_date_time_popup_input(value: &str) -> Option<String> {
+    let normalized = value.trim();
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized.to_string())
+    }
+}
+
+fn encode_date_time_range_filter_values(start: Option<String>, end: Option<String>) -> Vec<String> {
+    let mut values = Vec::new();
+    if let Some(start) = start {
+        values.push(format!("start={start}"));
+    }
+    if let Some(end) = end {
+        values.push(format!("end={end}"));
+    }
+    values
+}
+
+fn decode_date_time_range_filter_values(values: &[String]) -> DateTimeRangeFilterValues {
+    let mut result = DateTimeRangeFilterValues::default();
+
+    for value in values {
+        if let Some(start) = value.strip_prefix("start=") {
+            result.start = normalize_date_time_popup_input(start);
+            continue;
+        }
+        if let Some(end) = value.strip_prefix("end=") {
+            result.end = normalize_date_time_popup_input(end);
+        }
+    }
+
+    result
+}
+
+fn build_date_time_filter_clause(values: &[String]) -> Option<String> {
+    let range = decode_date_time_range_filter_values(values);
+    match (range.start.as_deref(), range.end.as_deref()) {
+        (None, None) => None,
+        (Some(start), None) => Some(format!("date time >= {start}")),
+        (None, Some(end)) => Some(format!("date time <= {end}")),
+        (Some(start), Some(end)) => {
+            let (start, end) = if start <= end {
+                (start, end)
+            } else {
+                (end, start)
+            };
+            Some(format!("date time between [{start} .. {end}]"))
+        }
+    }
+}
+
+fn packet_matches_date_time_filter(packet: &PacketSummary, values: &[String]) -> bool {
+    let range = decode_date_time_range_filter_values(values);
+    match (range.start.as_deref(), range.end.as_deref()) {
+        (None, None) => true,
+        (Some(start), None) => packet.timestamp.as_str() >= start,
+        (None, Some(end)) => packet.timestamp.as_str() <= end,
+        (Some(start), Some(end)) => {
+            let (start, end) = if start <= end {
+                (start, end)
+            } else {
+                (end, start)
+            };
+            packet.timestamp.as_str() >= start && packet.timestamp.as_str() <= end
+        }
+    }
+}
+
+fn is_allowed_date_time_char(ch: char) -> bool {
+    ch.is_ascii_digit() || matches!(ch, '-' | ':' | '.' | ' ')
 }
 
 fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> Vec<String> {
@@ -489,6 +796,9 @@ fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> V
                     candidates.insert(version.to_string());
                 }
             }
+            FilterDimension::DateTime => {
+                candidates.insert(packet.timestamp.clone());
+            }
             FilterDimension::TrafficClass => {
                 if let Some(class) = packet_traffic_class(packet) {
                     candidates.insert(class.to_string());
@@ -538,7 +848,14 @@ fn packet_matches_all_active_filters(app: &App, packet: &PacketSummary) -> bool 
                 .map(|value| value.as_slice())
                 .unwrap_or(&[]);
 
-            values.is_empty() || packet_matches_any_value(packet, *dimension, values)
+            if values.is_empty() {
+                return true;
+            }
+            if *dimension == FilterDimension::DateTime {
+                return packet_matches_date_time_filter(packet, values);
+            }
+
+            packet_matches_any_value(packet, *dimension, values)
         })
 }
 
@@ -568,6 +885,7 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
         FilterDimension::IpVersion => {
             packet_ip_version(packet).is_some_and(|version| version == query)
         }
+        FilterDimension::DateTime => packet.timestamp == value.trim(),
         FilterDimension::TrafficClass => {
             packet_traffic_class(packet).is_some_and(|class| class == query)
         }
@@ -757,7 +1075,7 @@ impl Default for App {
 mod tests {
     use crate::domain::{FilterDimension, PacketSummary};
 
-    use super::{endpoint_host, endpoint_port, App, FocusPane};
+    use super::{endpoint_host, endpoint_port, App, DateTimePopupField, FocusPane};
 
     fn sample_packets() -> Vec<PacketSummary> {
         vec![
@@ -868,6 +1186,12 @@ mod tests {
         }
 
         panic!("failed to select filter dimension: {target:?}");
+    }
+
+    fn type_into_date_time_popup(app: &mut App, value: &str) {
+        for ch in value.chars() {
+            app.filter_popup_insert_char(ch);
+        }
     }
 
     #[test]
@@ -1197,6 +1521,70 @@ mod tests {
         assert_eq!(app.filter_expression(), "ip version = ipv6");
         assert_eq!(app.packets().len(), 1);
         assert!(app.packets()[0].source.contains(':'));
+    }
+
+    #[test]
+    fn date_time_popup_supports_optional_start_and_end_inputs() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::DateTime);
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::DateTime);
+
+        app.open_filter_popup();
+        assert!(app.is_filter_popup_date_time());
+        assert_eq!(app.filter_popup_candidates(), None);
+        assert_eq!(app.filter_popup_date_time_start_input(), Some(""));
+        assert_eq!(app.filter_popup_date_time_end_input(), Some(""));
+        assert_eq!(
+            app.filter_popup_date_time_active_field(),
+            Some(DateTimePopupField::Start)
+        );
+    }
+
+    #[test]
+    fn date_time_filter_applies_inclusive_start_and_end_bounds() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::DateTime);
+        app.open_filter_popup();
+        type_into_date_time_popup(&mut app, "1970-01-01 00:00:02.002000");
+        app.filter_popup_switch_date_time_field();
+        type_into_date_time_popup(&mut app, "1970-01-01 00:00:03.003000");
+        app.confirm_filter_popup();
+
+        assert_eq!(
+            app.filter_expression(),
+            "date time between [1970-01-01 00:00:02.002000 .. 1970-01-01 00:00:03.003000]"
+        );
+        assert_eq!(app.packets().len(), 2);
+    }
+
+    #[test]
+    fn date_time_filter_supports_only_start_or_only_end_bound() {
+        let mut start_only_app = App::with_packets(sample_packets(), String::new());
+        select_filter_dimension(&mut start_only_app, FilterDimension::DateTime);
+        start_only_app.open_filter_popup();
+        type_into_date_time_popup(&mut start_only_app, "1970-01-01 00:00:02.002000");
+        start_only_app.confirm_filter_popup();
+
+        assert_eq!(
+            start_only_app.filter_expression(),
+            "date time >= 1970-01-01 00:00:02.002000"
+        );
+        assert_eq!(start_only_app.packets().len(), 2);
+
+        let mut end_only_app = App::with_packets(sample_packets(), String::new());
+        select_filter_dimension(&mut end_only_app, FilterDimension::DateTime);
+        end_only_app.open_filter_popup();
+        end_only_app.filter_popup_switch_date_time_field();
+        type_into_date_time_popup(&mut end_only_app, "1970-01-01 00:00:01.001000");
+        end_only_app.confirm_filter_popup();
+
+        assert_eq!(
+            end_only_app.filter_expression(),
+            "date time <= 1970-01-01 00:00:01.001000"
+        );
+        assert_eq!(end_only_app.packets().len(), 1);
     }
 
     #[test]

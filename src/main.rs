@@ -208,19 +208,44 @@ fn handle_event(app: &mut App) -> AppResult<()> {
             }
 
             if app.is_filter_popup_open() {
-                match key.code {
-                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        app.quit()
+                if app.is_filter_popup_date_time() {
+                    match key.code {
+                        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            app.quit()
+                        }
+                        KeyCode::Char('q') => app.quit(),
+                        KeyCode::Char('j') | KeyCode::Down => app.move_down(),
+                        KeyCode::Char('k') | KeyCode::Up => app.move_up(),
+                        KeyCode::Tab | KeyCode::BackTab => {
+                            app.filter_popup_switch_date_time_field()
+                        }
+                        KeyCode::Backspace => app.filter_popup_backspace(),
+                        KeyCode::Char('c') => app.clear_filter_popup_selection(),
+                        KeyCode::Char('C') => app.clear_all_filters(),
+                        KeyCode::Enter => app.confirm_filter_popup(),
+                        KeyCode::Char(ch) => app.filter_popup_insert_char(ch),
+                        _ if is_popup_cancel_key(key.code, key.modifiers) => {
+                            app.close_filter_popup()
+                        }
+                        _ => {}
                     }
-                    KeyCode::Char('q') => app.quit(),
-                    KeyCode::Char('j') | KeyCode::Down => app.move_down(),
-                    KeyCode::Char('k') | KeyCode::Up => app.move_up(),
-                    KeyCode::Char(' ') => app.toggle_filter_popup_selection(),
-                    KeyCode::Char('c') => app.clear_filter_popup_selection(),
-                    KeyCode::Char('C') => app.clear_all_filters(),
-                    KeyCode::Enter => app.confirm_filter_popup(),
-                    _ if is_popup_cancel_key(key.code, key.modifiers) => app.close_filter_popup(),
-                    _ => {}
+                } else {
+                    match key.code {
+                        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            app.quit()
+                        }
+                        KeyCode::Char('q') => app.quit(),
+                        KeyCode::Char('j') | KeyCode::Down => app.move_down(),
+                        KeyCode::Char('k') | KeyCode::Up => app.move_up(),
+                        KeyCode::Char(' ') => app.toggle_filter_popup_selection(),
+                        KeyCode::Char('c') => app.clear_filter_popup_selection(),
+                        KeyCode::Char('C') => app.clear_all_filters(),
+                        KeyCode::Enter => app.confirm_filter_popup(),
+                        _ if is_popup_cancel_key(key.code, key.modifiers) => {
+                            app.close_filter_popup()
+                        }
+                        _ => {}
+                    }
                 }
                 return Ok(());
             }

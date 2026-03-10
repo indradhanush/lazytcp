@@ -1,0 +1,40 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Date Time Range Filter
+:END:
+#+TITLE: lazytcp Date Time Range Filter
+
+* Objective
+Add a =Date Time= range filter category in =Filter By= so users can constrain packets by timestamp interval.
+
+* Requested Behavior
+- =Filter By= includes a date-time category.
+- Popup lists available packet timestamps.
+- Selecting one timestamp filters exact match.
+- Selecting multiple timestamps applies an inclusive range from min to max selected.
+- Filter expression pane reflects the date-time range expression.
+
+* Scope
+In scope:
+- Extend =FilterDimension= with date-time category.
+- Add timestamp candidate extraction.
+- Add range matching semantics.
+- Add unit tests for popup candidates and range filtering.
+
+Out of scope:
+- Free-form timestamp input.
+- Timezone conversion UX.
+
+* Architecture Slice
+- =src/domain.rs=
+  - Add new dimension + labels.
+- =src/app.rs=
+  - Add date-time candidates and range-match behavior.
+  - Build range-oriented expression string.
+  - Add tests.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for date-time range filter slice.
+- 2026-03-10: Implemented date-time popup with optional start/end inputs.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.

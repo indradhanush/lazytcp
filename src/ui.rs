@@ -6,7 +6,7 @@ use ratatui::widgets::{
 };
 use ratatui::Frame;
 
-use crate::app::{App, FocusPane};
+use crate::app::{App, DateTimePopupField, FocusPane};
 use crate::domain::{tcp_packet_details, PacketSummary, TcpPacketDetails};
 
 pub fn render(frame: &mut Frame, app: &App) {
@@ -424,13 +424,18 @@ fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_footer(frame: &mut Frame, area: Rect) {
     let footer = Paragraph::new(
-        "q: quit | ?: keybindings | filter by pane: c clear selected category | enter: open popup | popup: space toggle, c clear category, C clear all, enter apply, esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
+        "q: quit | ?: keybindings | filter by pane: c clear selected category | enter: open popup | value popup: space toggle, c clear category | date-time popup: type start/end, tab switch, c clear fields | C clear all | enter apply | esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
     );
     frame.render_widget(footer, area);
 }
 
 fn render_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
     if !app.is_filter_popup_open() {
+        return;
+    }
+
+    if app.is_filter_popup_date_time() {
+        render_date_time_filter_popup(frame, app, area);
         return;
     }
 
@@ -485,6 +490,61 @@ fn render_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, popup_area, &mut state);
 }
 
+fn render_date_time_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
+    let popup_area = centered_rect(70, 45, area);
+    frame.render_widget(Clear, popup_area);
+
+    let start = app
+        .filter_popup_date_time_start_input()
+        .map(str::to_string)
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "<none>".to_string());
+    let end = app
+        .filter_popup_date_time_end_input()
+        .map(str::to_string)
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "<none>".to_string());
+    let active_field = app.filter_popup_date_time_active_field();
+
+    let start_style = if active_field == Some(DateTimePopupField::Start) {
+        Style::default()
+            .fg(Color::LightYellow)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    let end_style = if active_field == Some(DateTimePopupField::End) {
+        Style::default()
+            .fg(Color::LightYellow)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+
+    let lines = vec![
+        Line::raw("Set optional inclusive bounds for packet timestamps."),
+        Line::raw(""),
+        Line::from(vec![
+            Span::styled("Start: ", start_style),
+            Span::styled(start.clone(), start_style),
+        ]),
+        Line::from(vec![
+            Span::styled("End:   ", end_style),
+            Span::styled(end.clone(), end_style),
+        ]),
+        Line::raw(""),
+        Line::raw("Format example: 2026-03-09 22:17:20.900000"),
+    ];
+
+    let popup_footer =
+        Line::raw("type time | tab/j/k/↑/↓ switch field | backspace delete | c clear | enter apply | esc cancel")
+            .alignment(Alignment::Right);
+    let popup = Paragraph::new(lines)
+        .block(focused_block("Set Date Time Range", true).title_bottom(popup_footer))
+        .wrap(Wrap { trim: true });
+    frame.render_widget(popup, popup_area);
+}
+
 fn render_keybindings_popup(frame: &mut Frame, app: &App, area: Rect) {
     if !app.is_keybindings_popup_open() {
         return;
@@ -510,6 +570,15 @@ fn render_keybindings_popup(frame: &mut Frame, app: &App, area: Rect) {
         Line::raw("  c: clear values in current category"),
         Line::raw("  C: clear all active filters"),
         Line::raw("  enter: apply selection"),
+        Line::raw("  esc: cancel popup"),
+        Line::raw(""),
+        Line::raw("Date Time Popup"),
+        Line::raw("  type start/end values directly"),
+        Line::raw("  tab or j/k: switch Start/End field"),
+        Line::raw("  backspace: delete character"),
+        Line::raw("  c: clear both fields"),
+        Line::raw("  C: clear all active filters"),
+        Line::raw("  enter: apply range"),
         Line::raw("  esc: cancel popup"),
         Line::raw(""),
         Line::raw("Close This Help: esc / enter / ?"),

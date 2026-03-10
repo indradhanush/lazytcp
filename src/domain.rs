@@ -9,12 +9,13 @@ pub enum FilterDimension {
     Protocol,
     TcpFlags,
     IpVersion,
+    DateTime,
     TrafficClass,
     IcmpType,
 }
 
 impl FilterDimension {
-    pub const ALL: [FilterDimension; 11] = [
+    pub const ALL: [FilterDimension; 12] = [
         FilterDimension::Host,
         FilterDimension::Source,
         FilterDimension::Destination,
@@ -24,6 +25,7 @@ impl FilterDimension {
         FilterDimension::Protocol,
         FilterDimension::TcpFlags,
         FilterDimension::IpVersion,
+        FilterDimension::DateTime,
         FilterDimension::TrafficClass,
         FilterDimension::IcmpType,
     ];
@@ -39,6 +41,7 @@ impl FilterDimension {
             FilterDimension::Protocol => "protocol",
             FilterDimension::TcpFlags => "tcp flags",
             FilterDimension::IpVersion => "ip version",
+            FilterDimension::DateTime => "date time",
             FilterDimension::TrafficClass => "traffic class",
             FilterDimension::IcmpType => "icmp type",
         }
@@ -55,6 +58,7 @@ impl FilterDimension {
             FilterDimension::Protocol => "Protocol",
             FilterDimension::TcpFlags => "TCP Flags",
             FilterDimension::IpVersion => "IP Version",
+            FilterDimension::DateTime => "Date Time",
             FilterDimension::TrafficClass => "Traffic Class",
             FilterDimension::IcmpType => "ICMP Type",
         }
@@ -240,6 +244,7 @@ mod tests {
                 FilterDimension::Protocol,
                 FilterDimension::TcpFlags,
                 FilterDimension::IpVersion,
+                FilterDimension::DateTime,
                 FilterDimension::TrafficClass,
                 FilterDimension::IcmpType,
             ]
@@ -257,6 +262,7 @@ mod tests {
         assert_eq!(FilterDimension::Protocol.as_str(), "protocol");
         assert_eq!(FilterDimension::TcpFlags.as_str(), "tcp flags");
         assert_eq!(FilterDimension::IpVersion.as_str(), "ip version");
+        assert_eq!(FilterDimension::DateTime.as_str(), "date time");
         assert_eq!(FilterDimension::TrafficClass.as_str(), "traffic class");
         assert_eq!(FilterDimension::IcmpType.as_str(), "icmp type");
     }
@@ -272,6 +278,7 @@ mod tests {
         assert_eq!(FilterDimension::Protocol.display_name(), "Protocol");
         assert_eq!(FilterDimension::TcpFlags.display_name(), "TCP Flags");
         assert_eq!(FilterDimension::IpVersion.display_name(), "IP Version");
+        assert_eq!(FilterDimension::DateTime.display_name(), "Date Time");
         assert_eq!(
             FilterDimension::TrafficClass.display_name(),
             "Traffic Class"
