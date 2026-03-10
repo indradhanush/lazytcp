@@ -486,6 +486,9 @@ fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> V
                     candidates.insert(version.to_string());
                 }
             }
+            FilterDimension::PacketLength => {
+                candidates.insert(packet.length.to_string());
+            }
         }
     }
 
@@ -543,6 +546,10 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
         FilterDimension::IpVersion => {
             packet_ip_version(packet).is_some_and(|version| version == query)
         }
+        FilterDimension::PacketLength => query
+            .parse::<usize>()
+            .ok()
+            .is_some_and(|length| packet.length == length),
     }
 }
 
@@ -691,6 +698,35 @@ mod tests {
             summary: "UDP, length 32".to_string(),
         });
         packets
+    }
+
+    fn sample_packets_with_varied_lengths() -> Vec<PacketSummary> {
+        vec![
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                source: "10.0.0.12.51544".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 0,
+                summary: "Flags [S], length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                source: "10.0.0.12.34211".to_string(),
+                destination: "8.8.8.8.53".to_string(),
+                protocol: "UDP".to_string(),
+                length: 12,
+                summary: "UDP, length 12".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                source: "192.168.1.5.60000".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 84,
+                summary: "Flags [.], length 84".to_string(),
+            },
+        ]
     }
 
     fn select_filter_dimension(app: &mut App, target: FilterDimension) {
@@ -1007,6 +1043,41 @@ mod tests {
         assert_eq!(app.filter_expression(), "ip version = ipv6");
         assert_eq!(app.packets().len(), 1);
         assert!(app.packets()[0].source.contains(':'));
+    }
+
+    #[test]
+    fn length_popup_lists_unique_packet_lengths() {
+        let mut app = App::with_packets(sample_packets_with_varied_lengths(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::PacketLength);
+        assert_eq!(
+            app.selected_filter_dimension(),
+            FilterDimension::PacketLength
+        );
+
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("length popup should expose candidates");
+        assert_eq!(
+            candidates,
+            &["0".to_string(), "12".to_string(), "84".to_string()]
+        );
+    }
+
+    #[test]
+    fn length_filter_matches_only_packets_of_selected_length() {
+        let mut app = App::with_packets(sample_packets_with_varied_lengths(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::PacketLength);
+        app.open_filter_popup();
+        app.move_down();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "length = 12");
+        assert_eq!(app.packets().len(), 1);
+        assert_eq!(app.packets()[0].length, 12);
     }
 
     #[test]

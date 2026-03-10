@@ -9,10 +9,11 @@ pub enum FilterDimension {
     Protocol,
     TcpFlags,
     IpVersion,
+    PacketLength,
 }
 
 impl FilterDimension {
-    pub const ALL: [FilterDimension; 9] = [
+    pub const ALL: [FilterDimension; 10] = [
         FilterDimension::Host,
         FilterDimension::Source,
         FilterDimension::Destination,
@@ -22,6 +23,7 @@ impl FilterDimension {
         FilterDimension::Protocol,
         FilterDimension::TcpFlags,
         FilterDimension::IpVersion,
+        FilterDimension::PacketLength,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -35,6 +37,7 @@ impl FilterDimension {
             FilterDimension::Protocol => "protocol",
             FilterDimension::TcpFlags => "tcp flags",
             FilterDimension::IpVersion => "ip version",
+            FilterDimension::PacketLength => "length",
         }
     }
 }
@@ -218,6 +221,7 @@ mod tests {
                 FilterDimension::Protocol,
                 FilterDimension::TcpFlags,
                 FilterDimension::IpVersion,
+                FilterDimension::PacketLength,
             ]
         );
     }
@@ -233,6 +237,7 @@ mod tests {
         assert_eq!(FilterDimension::Protocol.as_str(), "protocol");
         assert_eq!(FilterDimension::TcpFlags.as_str(), "tcp flags");
         assert_eq!(FilterDimension::IpVersion.as_str(), "ip version");
+        assert_eq!(FilterDimension::PacketLength.as_str(), "length");
     }
 
     #[test]
