@@ -123,13 +123,24 @@ impl App {
             return;
         }
 
-        self.selected_filter_dimension =
-            (self.selected_filter_dimension + 1).min(self.filter_dimensions.len() - 1);
-        self.apply_active_filter();
+        let next_index = (self.selected_filter_dimension + 1).min(self.filter_dimensions.len() - 1);
+        self.update_filter_dimension(next_index);
     }
 
     pub fn previous_filter_dimension(&mut self) {
-        self.selected_filter_dimension = self.selected_filter_dimension.saturating_sub(1);
+        let previous_index = self.selected_filter_dimension.saturating_sub(1);
+        self.update_filter_dimension(previous_index);
+    }
+
+    fn update_filter_dimension(&mut self, new_index: usize) {
+        let old_dimension = self.selected_filter_dimension();
+        self.selected_filter_dimension = new_index;
+        let new_dimension = self.selected_filter_dimension();
+
+        if !should_retain_filter_input(old_dimension, new_dimension) {
+            self.filter_input.clear();
+        }
+
         self.apply_active_filter();
     }
 
@@ -229,6 +240,20 @@ fn endpoint_port(endpoint: &str) -> Option<&str> {
         return Some(port);
     }
     None
+}
+
+fn should_retain_filter_input(
+    old_dimension: FilterDimension,
+    new_dimension: FilterDimension,
+) -> bool {
+    is_endpoint_dimension(old_dimension) && is_endpoint_dimension(new_dimension)
+}
+
+fn is_endpoint_dimension(dimension: FilterDimension) -> bool {
+    matches!(
+        dimension,
+        FilterDimension::Host | FilterDimension::Source | FilterDimension::Destination
+    )
 }
 
 impl Default for App {
@@ -425,6 +450,64 @@ mod tests {
 
         app.next_filter_dimension();
         assert_eq!(app.selected_filter_dimension(), FilterDimension::Source);
+        assert_eq!(app.filter_input(), "8.8.8.8");
         assert_eq!(app.packets().len(), 0);
+    }
+
+    #[test]
+    fn changing_dimension_to_port_clears_existing_filter_input() {
+        let mut app = App::with_packets(sample_packets(), "8.8.8.8".to_string());
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Host);
+
+        app.next_filter_dimension();
+        app.next_filter_dimension();
+        app.next_filter_dimension();
+
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Port);
+        assert_eq!(app.filter_input(), "");
+        assert_eq!(app.packets().len(), 2);
+    }
+
+    #[test]
+    fn changing_dimension_from_port_clears_existing_filter_input() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+        app.next_filter_dimension();
+        app.next_filter_dimension();
+        app.next_filter_dimension();
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Port);
+
+        app.insert_filter_input_char('4');
+        app.insert_filter_input_char('4');
+        app.insert_filter_input_char('3');
+        assert_eq!(app.filter_input(), "443");
+        assert_eq!(app.packets().len(), 1);
+
+        app.previous_filter_dimension();
+        assert_eq!(
+            app.selected_filter_dimension(),
+            FilterDimension::Destination
+        );
+        assert_eq!(app.filter_input(), "");
+        assert_eq!(app.packets().len(), 2);
+    }
+
+    #[test]
+    fn changing_dimension_from_protocol_clears_existing_filter_input() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+        for _ in 0..4 {
+            app.next_filter_dimension();
+        }
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
+
+        app.insert_filter_input_char('u');
+        app.insert_filter_input_char('d');
+        app.insert_filter_input_char('p');
+        assert_eq!(app.filter_input(), "udp");
+        assert_eq!(app.packets().len(), 1);
+
+        app.previous_filter_dimension();
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Port);
+        assert_eq!(app.filter_input(), "");
+        assert_eq!(app.packets().len(), 2);
     }
 }
