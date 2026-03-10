@@ -481,6 +481,11 @@ fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> V
                     candidates.insert(flag.to_string());
                 }
             }
+            FilterDimension::IpVersion => {
+                if let Some(version) = packet_ip_version(packet) {
+                    candidates.insert(version.to_string());
+                }
+            }
         }
     }
 
@@ -535,6 +540,9 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
         FilterDimension::TcpFlags => tcp_flags_from_summary(&packet.summary)
             .iter()
             .any(|flag| *flag == query.as_str()),
+        FilterDimension::IpVersion => {
+            packet_ip_version(packet).is_some_and(|version| version == query)
+        }
     }
 }
 
@@ -577,6 +585,24 @@ fn endpoint_host(endpoint: &str) -> String {
     split_endpoint_host_port(endpoint)
         .map(|(host, _)| host.to_ascii_lowercase())
         .unwrap_or_else(|| endpoint.to_ascii_lowercase())
+}
+
+fn packet_ip_version(packet: &PacketSummary) -> Option<&'static str> {
+    endpoint_ip_version(&packet.source).or_else(|| endpoint_ip_version(&packet.destination))
+}
+
+fn endpoint_ip_version(endpoint: &str) -> Option<&'static str> {
+    let host = split_endpoint_host_port(endpoint)
+        .map(|(host, _)| host)
+        .unwrap_or(endpoint);
+
+    if host.contains(':') {
+        return Some("ipv6");
+    }
+    if is_ipv4_address(host) {
+        return Some("ipv4");
+    }
+    None
 }
 
 fn endpoint_port(endpoint: &str) -> Option<String> {
@@ -652,6 +678,19 @@ mod tests {
                 summary: "Flags [.], length 0".to_string(),
             },
         ]
+    }
+
+    fn sample_packets_with_ipv6() -> Vec<PacketSummary> {
+        let mut packets = sample_packets();
+        packets.push(PacketSummary {
+            timestamp: "1970-01-01 00:00:04.004000".to_string(),
+            source: "fe80::1.5353".to_string(),
+            destination: "ff02::fb.5353".to_string(),
+            protocol: "UDP".to_string(),
+            length: 32,
+            summary: "UDP, length 32".to_string(),
+        });
+        packets
     }
 
     fn select_filter_dimension(app: &mut App, target: FilterDimension) {
@@ -730,7 +769,12 @@ mod tests {
         }
 
         assert_eq!(app.selected_filter_dimension_index(), last_index);
-        assert_eq!(app.selected_filter_dimension(), FilterDimension::TcpFlags);
+        assert_eq!(
+            app.selected_filter_dimension(),
+            *app.filter_dimensions()
+                .last()
+                .expect("at least one filter dimension should exist")
+        );
     }
 
     #[test]
@@ -934,6 +978,35 @@ mod tests {
             .packets()
             .iter()
             .all(|packet| packet.destination.ends_with(".443")));
+    }
+
+    #[test]
+    fn ip_version_popup_lists_ipv4_and_ipv6_candidates() {
+        let mut app = App::with_packets(sample_packets_with_ipv6(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::IpVersion);
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::IpVersion);
+
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("ip version popup should expose candidates");
+        assert_eq!(candidates, &["ipv4".to_string(), "ipv6".to_string()]);
+    }
+
+    #[test]
+    fn ip_version_filter_matches_only_requested_address_family() {
+        let mut app = App::with_packets(sample_packets_with_ipv6(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::IpVersion);
+        app.open_filter_popup();
+        app.move_down();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "ip version = ipv6");
+        assert_eq!(app.packets().len(), 1);
+        assert!(app.packets()[0].source.contains(':'));
     }
 
     #[test]

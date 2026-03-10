@@ -1,0 +1,46 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Additional Filter Categories
+:END:
+#+TITLE: lazytcp Additional Filter Categories
+
+* Objective
+Implement additional =Filter By= categories incrementally, one verified slice at a time.
+
+* Categories To Add (in order)
+1. =ip version=
+2. =length=
+3. =traffic class=
+4. =icmp type=
+
+* Scope
+In scope:
+- Extend =FilterDimension= and labels for each category.
+- Add popup candidate extraction and matching semantics.
+- Add focused tests per category.
+- Keep existing filter behavior and AND semantics intact.
+
+Out of scope:
+- Capture backend process changes.
+- Free-form BPF parser/editor.
+
+* Execution Slices
+** Slice 1: IP Version
+- Add =ip version= dimension with candidates =ipv4= / =ipv6=.
+- Match packets based on endpoint host address family.
+
+** Slice 2: Packet Length
+- Add =length= dimension with numeric candidates from parsed packet lengths.
+- Match packets by exact length value.
+
+** Slice 3: Traffic Class
+- Add =traffic class= dimension with =unicast/multicast/broadcast=.
+- Classify based on destination host address.
+
+** Slice 4: ICMP Type
+- Add =icmp type= dimension for ICMP/ICMP6 summary-derived type labels.
+- Match packets by parsed type string.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for additional filter categories.
+- 2026-03-10: Slice 1 (=ip version=) implemented.
+- 2026-03-10: Slice 1 verification passed (=cargo fmt=, =cargo test=, =cargo check=).
