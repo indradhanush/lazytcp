@@ -96,6 +96,20 @@ impl App {
         &self.filter_expression
     }
 
+    pub fn is_filter_dimension_active(&self, dimension: FilterDimension) -> bool {
+        let Some(index) = self
+            .filter_dimensions
+            .iter()
+            .position(|candidate| *candidate == dimension)
+        else {
+            return false;
+        };
+
+        self.active_filter_values_by_dimension
+            .get(index)
+            .is_some_and(|values| !values.is_empty())
+    }
+
     pub fn is_filter_popup_open(&self) -> bool {
         self.filter_popup.is_some()
     }
@@ -847,6 +861,37 @@ mod tests {
 
         assert_eq!(app.filter_expression(), "");
         assert_eq!(app.packets().len(), 3);
+    }
+
+    #[test]
+    fn filter_dimension_active_state_reflects_applied_selections() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        assert!(!app.is_filter_dimension_active(FilterDimension::Host));
+        assert!(!app.is_filter_dimension_active(FilterDimension::Protocol));
+
+        app.open_filter_popup();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+        assert!(app.is_filter_dimension_active(FilterDimension::Host));
+        assert!(!app.is_filter_dimension_active(FilterDimension::Protocol));
+
+        for _ in 0..4 {
+            app.next_filter_dimension();
+        }
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
+
+        app.open_filter_popup();
+        app.move_down();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert!(app.is_filter_dimension_active(FilterDimension::Host));
+        assert!(app.is_filter_dimension_active(FilterDimension::Protocol));
+
+        app.clear_all_filters();
+        assert!(!app.is_filter_dimension_active(FilterDimension::Host));
+        assert!(!app.is_filter_dimension_active(FilterDimension::Protocol));
     }
 
     #[test]

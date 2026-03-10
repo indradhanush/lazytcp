@@ -1,0 +1,33 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Filter By Active Indicator
+:END:
+#+TITLE: lazytcp Filter By Active Indicator
+
+* Objective
+Show an active-state indicator in the =Filter By= pane when a filter dimension currently has selected values.
+
+* Requested Behavior
+- If a filter has selections applied, that filter row in =Filter By= should visibly indicate active state.
+
+* Scope
+In scope:
+- Expose per-dimension active-state query from app state.
+- Render active marker in filter selector rows.
+- Add focused tests for active-state behavior.
+
+Out of scope:
+- Filter logic changes.
+- Keybinding changes.
+
+* Architecture Slice
+- =src/app.rs=
+  - Add a public query method for per-dimension active state.
+  - Add unit test covering active state transitions.
+- =src/ui.rs=
+  - Update filter selector row labels to include active indicator.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for filter-by active indicator slice.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.

@@ -87,7 +87,7 @@ fn render_filter_selector(frame: &mut Frame, app: &App, area: Rect) {
     let items: Vec<ListItem> = app
         .filter_dimensions()
         .iter()
-        .map(|dimension| ListItem::new(Line::raw(dimension.as_str())))
+        .map(|dimension| ListItem::new(Line::raw(filter_dimension_label(app, *dimension))))
         .collect();
 
     let list = List::new(items)
@@ -109,6 +109,14 @@ fn render_filter_selector(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     frame.render_stateful_widget(list, area, &mut state);
+}
+
+fn filter_dimension_label(app: &App, dimension: crate::domain::FilterDimension) -> String {
+    if app.is_filter_dimension_active(dimension) {
+        format!("{} *", dimension.as_str())
+    } else {
+        dimension.as_str().to_string()
+    }
 }
 
 fn render_packet_detail(frame: &mut Frame, app: &App, area: Rect) {
