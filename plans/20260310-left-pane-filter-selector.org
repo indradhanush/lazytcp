@@ -1,3 +1,6 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Left Filter Pane Plan
+:END:
 #+TITLE: lazytcp Left Filter Pane Plan
 
 * Objective
@@ -21,7 +24,7 @@ Add a left-side, scrollable filter selector pane so operators can quickly choose
 In scope:
 - Add a dedicated left filter selector pane rendered as a list.
 - Make the filter list scrollable with stable selection/highlight.
-- Add focus/navigation behavior for the new pane while preserving existing keys (=q=, =j/down=, =k/up=, =tab=).
+- Add focus/navigation behavior for the new pane while preserving existing keys (=q=, =j/down=, =k/up=, =tab, shift+tab=).
 - Reflect selected filter dimension in app state so follow-up input workflows can use it.
 
 Out of scope:
