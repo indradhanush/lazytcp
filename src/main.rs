@@ -1,9 +1,11 @@
 use std::io;
 use std::path::PathBuf;
 use std::process;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
+use crossterm::cursor::DisableBlinking;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::style::Print;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
@@ -157,11 +159,14 @@ fn init_terminal() -> AppResult<Terminal<CrosstermBackend<io::Stdout>>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     terminal.clear()?;
+    terminal.hide_cursor()?;
     Ok(terminal)
 }
 
 fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
     disable_raw_mode()?;
+    let _ = reset_cursor_color(terminal);
+    let _ = terminal.backend_mut().execute(DisableBlinking);
     terminal.backend_mut().execute(LeaveAlternateScreen)?;
     terminal.show_cursor()?;
     Ok(())
@@ -173,15 +178,75 @@ fn run_app(
     filter_input: String,
 ) -> AppResult<()> {
     let mut app = App::with_packets(packets, filter_input);
+    let mut date_time_cursor_visible = true;
+    let mut last_blink_toggle_at = Instant::now();
+    let mut date_time_cursor_color_applied = false;
 
     while !app.should_quit() {
         terminal.draw(|frame| ui::render(frame, &app))?;
+        sync_date_time_cursor_mode(
+            terminal,
+            &app,
+            &mut date_time_cursor_visible,
+            &mut last_blink_toggle_at,
+            &mut date_time_cursor_color_applied,
+        )?;
 
         if event::poll(Duration::from_millis(100))? {
             handle_event(&mut app)?;
         }
     }
 
+    Ok(())
+}
+
+fn sync_date_time_cursor_mode(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    app: &App,
+    date_time_cursor_visible: &mut bool,
+    last_blink_toggle_at: &mut Instant,
+    date_time_cursor_color_applied: &mut bool,
+) -> io::Result<()> {
+    let should_activate = app.is_filter_popup_open() && app.is_filter_popup_date_time();
+    const BLINK_INTERVAL: Duration = Duration::from_millis(500);
+
+    if !should_activate {
+        if *date_time_cursor_color_applied {
+            reset_cursor_color(terminal)?;
+            *date_time_cursor_color_applied = false;
+        }
+        terminal.hide_cursor()?;
+        *date_time_cursor_visible = true;
+        *last_blink_toggle_at = Instant::now();
+        return Ok(());
+    }
+
+    if !*date_time_cursor_color_applied {
+        set_cursor_color_black(terminal)?;
+        *date_time_cursor_color_applied = true;
+    }
+
+    if last_blink_toggle_at.elapsed() >= BLINK_INTERVAL {
+        *date_time_cursor_visible = !*date_time_cursor_visible;
+        *last_blink_toggle_at = Instant::now();
+    }
+
+    if *date_time_cursor_visible {
+        terminal.show_cursor()?;
+    } else {
+        terminal.hide_cursor()?;
+    }
+
+    Ok(())
+}
+
+fn set_cursor_color_black(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+    terminal.backend_mut().execute(Print("\x1b]12;black\x07"))?;
+    Ok(())
+}
+
+fn reset_cursor_color(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+    terminal.backend_mut().execute(Print("\x1b]112\x07"))?;
     Ok(())
 }
 
