@@ -8,16 +8,18 @@ Add a =Date Time= range filter category in =Filter By= so users can constrain pa
 
 * Requested Behavior
 - =Filter By= includes a date-time category.
-- Popup lists available packet timestamps.
-- Selecting one timestamp filters exact match.
-- Selecting multiple timestamps applies an inclusive range from min to max selected.
+- Popup provides editable =Start= and =End= time fields.
+- Start and end are both optional.
+- If only start is set, filter applies =timestamp >= start=.
+- If only end is set, filter applies =timestamp <= end=.
+- If both are set, filter applies inclusive range between bounds.
 - Filter expression pane reflects the date-time range expression.
 
 * Scope
 In scope:
 - Extend =FilterDimension= with date-time category.
-- Add timestamp candidate extraction.
-- Add range matching semantics.
+- Add popup input mode for optional start/end values.
+- Add range matching semantics for optional bounds.
 - Add unit tests for popup candidates and range filtering.
 
 Out of scope:
@@ -28,7 +30,7 @@ Out of scope:
 - =src/domain.rs=
   - Add new dimension + labels.
 - =src/app.rs=
-  - Add date-time candidates and range-match behavior.
+  - Add date-time popup input mode and range-match behavior.
   - Build range-oriented expression string.
   - Add tests.
 
