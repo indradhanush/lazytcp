@@ -164,15 +164,15 @@ impl App {
         self.focus = match self.focus {
             FocusPane::FilterSelector => FocusPane::PacketList,
             FocusPane::PacketList => FocusPane::PacketDetail,
-            FocusPane::PacketDetail => FocusPane::FilterInput,
-            FocusPane::FilterInput => FocusPane::FilterSelector,
+            FocusPane::PacketDetail => FocusPane::FilterSelector,
+            FocusPane::FilterInput => FocusPane::PacketList,
         };
     }
 
     pub fn reverse_cycle_focus(&mut self) {
         self.focus = match self.focus {
-            FocusPane::FilterSelector => FocusPane::FilterInput,
-            FocusPane::FilterInput => FocusPane::PacketDetail,
+            FocusPane::FilterSelector => FocusPane::PacketDetail,
+            FocusPane::FilterInput => FocusPane::FilterSelector,
             FocusPane::PacketDetail => FocusPane::PacketList,
             FocusPane::PacketList => FocusPane::FilterSelector,
         };
@@ -301,9 +301,6 @@ mod tests {
         assert_eq!(app.focus(), FocusPane::PacketDetail);
 
         app.cycle_focus();
-        assert_eq!(app.focus(), FocusPane::FilterInput);
-
-        app.cycle_focus();
         assert_eq!(app.focus(), FocusPane::FilterSelector);
     }
 
@@ -412,13 +409,30 @@ mod tests {
         assert_eq!(app.focus(), FocusPane::FilterSelector);
 
         app.reverse_cycle_focus();
-        assert_eq!(app.focus(), FocusPane::FilterInput);
-
-        app.reverse_cycle_focus();
         assert_eq!(app.focus(), FocusPane::PacketDetail);
 
         app.reverse_cycle_focus();
         assert_eq!(app.focus(), FocusPane::PacketList);
+
+        app.reverse_cycle_focus();
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+    }
+
+    #[test]
+    fn cycle_focus_from_filter_input_returns_to_packet_list() {
+        let mut app = App::new();
+        app.focus_filter_input();
+        assert_eq!(app.focus(), FocusPane::FilterInput);
+
+        app.cycle_focus();
+        assert_eq!(app.focus(), FocusPane::PacketList);
+    }
+
+    #[test]
+    fn reverse_cycle_focus_from_filter_input_returns_to_filter_selector() {
+        let mut app = App::new();
+        app.focus_filter_input();
+        assert_eq!(app.focus(), FocusPane::FilterInput);
 
         app.reverse_cycle_focus();
         assert_eq!(app.focus(), FocusPane::FilterSelector);
