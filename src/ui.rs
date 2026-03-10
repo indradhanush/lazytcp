@@ -1,7 +1,7 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::Frame;
 
 use crate::app::{App, FocusPane};
@@ -22,18 +22,20 @@ pub fn render(frame: &mut Frame, app: &App) {
 
     let body = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(18),
-            Constraint::Percentage(52),
-            Constraint::Percentage(48),
-        ])
+        .constraints([Constraint::Length(18), Constraint::Min(20)])
         .split(root[1]);
 
+    let packet_panes = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(body[1]);
+
     render_filter_selector(frame, app, body[0]);
-    render_packet_list(frame, app, body[1]);
-    render_packet_detail(frame, app, body[2]);
+    render_packet_list(frame, app, packet_panes[0]);
+    render_packet_detail(frame, app, packet_panes[1]);
     render_filter_bar(frame, app, root[2]);
     render_footer(frame, root[3]);
+    render_filter_popup(frame, app, frame.area());
 }
 
 fn render_header(frame: &mut Frame, app: &App, area: Rect) {
@@ -329,11 +331,11 @@ fn bit(value: bool) -> u8 {
 }
 
 fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
-    let filter_display = format!(
-        "{}: {}",
-        app.selected_filter_dimension().as_str(),
-        app.filter_input()
-    );
+    let filter_display = if app.filter_expression().is_empty() {
+        "no filters applied".to_string()
+    } else {
+        app.filter_expression().to_string()
+    };
 
     let filter = Paragraph::new(filter_display).block(focused_block(
         "Filter Expression",
@@ -341,19 +343,77 @@ fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
     ));
 
     frame.render_widget(filter, area);
-
-    if app.focus() == FocusPane::FilterInput {
-        if let Some((x, y)) = filter_cursor_position(area, app) {
-            frame.set_cursor_position((x, y));
-        }
-    }
 }
 
 fn render_footer(frame: &mut Frame, area: Rect) {
     let footer = Paragraph::new(
-        "q: quit | j/k or arrows: move selection in focused list | enter: filter type -> expression -> packets | tab/shift+tab: cycle focus",
+        "q: quit | enter on filter type: open popup | popup: space toggle, enter apply, esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
     );
     frame.render_widget(footer, area);
+}
+
+fn render_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
+    if !app.is_filter_popup_open() {
+        return;
+    }
+
+    let popup_area = centered_rect(60, 70, area);
+    frame.render_widget(Clear, popup_area);
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(4), Constraint::Length(3)])
+        .split(popup_area);
+
+    let dimension = app
+        .filter_popup_dimension()
+        .map(|value| value.as_str())
+        .unwrap_or("filter");
+    let candidates = app.filter_popup_candidates().unwrap_or(&[]);
+
+    let items: Vec<ListItem> = if candidates.is_empty() {
+        vec![ListItem::new(Line::raw(
+            "No values available for this filter type",
+        ))]
+    } else {
+        candidates
+            .iter()
+            .enumerate()
+            .map(|(index, candidate)| {
+                let marker = if app.filter_popup_candidate_selected(index) {
+                    "[x]"
+                } else {
+                    "[ ]"
+                };
+                ListItem::new(Line::raw(format!("{marker} {candidate}")))
+            })
+            .collect()
+    };
+
+    let popup_title = format!("Select {} values", dimension);
+    let list = List::new(items)
+        .block(focused_block(&popup_title, true))
+        .highlight_style(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::LightYellow)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(">> ");
+
+    let mut state = ListState::default();
+    if !candidates.is_empty() {
+        state.select(app.filter_popup_selected_index());
+    }
+
+    frame.render_stateful_widget(list, rows[0], &mut state);
+
+    let hints = Paragraph::new("space: toggle | enter: apply | esc: cancel").block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Popup Controls"),
+    );
+    frame.render_widget(hints, rows[1]);
 }
 
 fn focused_block(title: &str, is_focused: bool) -> Block<'_> {
@@ -371,48 +431,48 @@ fn focused_block(title: &str, is_focused: bool) -> Block<'_> {
         .border_style(border_style)
 }
 
-fn filter_cursor_position(area: Rect, app: &App) -> Option<(u16, u16)> {
-    let inner = area.inner(ratatui::layout::Margin {
-        horizontal: 1,
-        vertical: 1,
-    });
-    if inner.width == 0 || inner.height == 0 {
-        return None;
-    }
+fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
+    let vertical = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(area);
 
-    let prefix = format!("{}: ", app.selected_filter_dimension().as_str());
-    let cursor_col = prefix.chars().count() + app.filter_input().chars().count();
-
-    let max_col = inner.width.saturating_sub(1) as usize;
-    let clamped_col = cursor_col.min(max_col) as u16;
-    Some((inner.x.saturating_add(clamped_col), inner.y))
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(vertical[1])[1]
 }
 
 #[cfg(test)]
 mod tests {
-    use super::filter_cursor_position;
-    use crate::app::App;
+    use super::centered_rect;
     use ratatui::layout::Rect;
 
     #[test]
-    fn filter_cursor_position_is_inside_filter_bar_inner_area() {
-        let mut app = App::new();
-        app.focus_filter_input();
-        app.insert_filter_input_char('u');
-        app.insert_filter_input_char('d');
-        app.insert_filter_input_char('p');
+    fn centered_rect_stays_within_outer_area() {
+        let outer = Rect::new(0, 0, 100, 40);
+        let inner = centered_rect(60, 70, outer);
 
-        let area = Rect::new(0, 0, 30, 3);
-        let (x, y) = filter_cursor_position(area, &app)
-            .expect("cursor should be available for a valid filter area");
-
-        assert!((1..=28).contains(&x));
-        assert_eq!(y, 1);
+        assert!(inner.x >= outer.x);
+        assert!(inner.y >= outer.y);
+        assert!(inner.width <= outer.width);
+        assert!(inner.height <= outer.height);
     }
 
     #[test]
-    fn filter_cursor_position_returns_none_when_area_too_small() {
-        let app = App::new();
-        assert!(filter_cursor_position(Rect::new(0, 0, 1, 1), &app).is_none());
+    fn centered_rect_matches_expected_percentages() {
+        let outer = Rect::new(0, 0, 100, 40);
+        let inner = centered_rect(60, 70, outer);
+
+        assert_eq!(inner.width, 60);
+        assert_eq!(inner.height, 28);
     }
 }
