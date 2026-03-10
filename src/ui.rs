@@ -1,6 +1,6 @@
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{
     Block, BorderType, Borders, Clear, List, ListItem, ListState, Padding, Paragraph, Wrap,
 };
@@ -223,28 +223,7 @@ fn render_tcp_packet_visualizer(
         format_option(details.reserved_bits.as_deref().map(str::to_string)),
     );
 
-    render_sub_pane(
-        frame,
-        control_row[2],
-        "Flags",
-        format!(
-            "N{} C{} E{} U{} A{} P{} R{} S{} F{} [{}]",
-            bit(details.flags.ns),
-            bit(details.flags.cwr),
-            bit(details.flags.ece),
-            bit(details.flags.urg),
-            bit(details.flags.ack),
-            bit(details.flags.psh),
-            bit(details.flags.rst),
-            bit(details.flags.syn),
-            bit(details.flags.fin),
-            if details.flags.raw.is_empty() {
-                "-"
-            } else {
-                &details.flags.raw
-            }
-        ),
-    );
+    render_tcp_flags_sub_pane(frame, control_row[2], details);
 
     render_sub_pane(
         frame,
@@ -316,20 +295,64 @@ fn render_sub_pane(frame: &mut Frame, area: Rect, title: &str, value: impl Into<
     frame.render_widget(pane, area);
 }
 
+fn render_tcp_flags_sub_pane(frame: &mut Frame, area: Rect, details: &TcpPacketDetails) {
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+
+    let raw_flags = if details.flags.raw.is_empty() {
+        "-"
+    } else {
+        &details.flags.raw
+    };
+
+    let flags_line = Line::from(vec![
+        tcp_flag_span("N", details.flags.ns),
+        Span::raw(" "),
+        tcp_flag_span("C", details.flags.cwr),
+        Span::raw(" "),
+        tcp_flag_span("E", details.flags.ece),
+        Span::raw(" "),
+        tcp_flag_span("U", details.flags.urg),
+        Span::raw(" "),
+        tcp_flag_span("A", details.flags.ack),
+        Span::raw(" "),
+        tcp_flag_span("P", details.flags.psh),
+        Span::raw(" "),
+        tcp_flag_span("R", details.flags.rst),
+        Span::raw(" "),
+        tcp_flag_span("S", details.flags.syn),
+        Span::raw(" "),
+        tcp_flag_span("F", details.flags.fin),
+    ]);
+
+    let pane = Paragraph::new(vec![flags_line, Line::raw(format!("raw: [{raw_flags}]"))])
+        .block(Block::default().borders(Borders::ALL).title("Flags"))
+        .wrap(Wrap { trim: true });
+    frame.render_widget(pane, area);
+}
+
+fn tcp_flag_span(label: &str, is_set: bool) -> Span<'static> {
+    let value = if is_set { "1" } else { "0" };
+    let style = if is_set {
+        Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+            .fg(Color::DarkGray)
+            .add_modifier(Modifier::DIM)
+    };
+
+    Span::styled(format!("{label}{value}"), style)
+}
+
 fn area_too_small_for_tcp_layout(area: Rect) -> bool {
     area.width < 36 || area.height < 21
 }
 
 fn format_option(value: Option<String>) -> String {
     value.unwrap_or_else(|| "-".to_string())
-}
-
-fn bit(value: bool) -> u8 {
-    if value {
-        1
-    } else {
-        0
-    }
 }
 
 fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
