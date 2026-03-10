@@ -24,7 +24,7 @@ pub fn render(frame: &mut Frame, app: &App) {
 
     let body = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Length(18), Constraint::Min(20)])
+        .constraints([Constraint::Length(24), Constraint::Min(20)])
         .split(root[1]);
 
     let packet_panes = Layout::default()
@@ -92,7 +92,7 @@ fn render_filter_selector(frame: &mut Frame, app: &App, area: Rect) {
 
     let list = List::new(items)
         .block(focused_block(
-            "Filter Type",
+            "Filter By",
             app.focus() == FocusPane::FilterSelector,
         ))
         .highlight_style(
@@ -349,7 +349,7 @@ fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_footer(frame: &mut Frame, area: Rect) {
     let footer = Paragraph::new(
-        "q: quit | enter on filter type: open popup | popup: space toggle, enter apply, esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
+        "q: quit | enter on filter by pane: open popup | popup: space toggle, enter apply, esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
     );
     frame.render_widget(footer, area);
 }
