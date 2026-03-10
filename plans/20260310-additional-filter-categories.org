@@ -48,3 +48,5 @@ Out of scope:
 - 2026-03-10: Slice 2 verification passed (=cargo fmt=, =cargo test=, =cargo check=).
 - 2026-03-10: Slice 3 (=traffic class=) implemented.
 - 2026-03-10: Slice 3 verification passed (=cargo fmt=, =cargo test=, =cargo check=).
+- 2026-03-10: Slice 4 (=icmp type=) implemented.
+- 2026-03-10: Slice 4 verification passed (=cargo fmt=, =cargo test=, =cargo check=).

@@ -11,10 +11,11 @@ pub enum FilterDimension {
     IpVersion,
     PacketLength,
     TrafficClass,
+    IcmpType,
 }
 
 impl FilterDimension {
-    pub const ALL: [FilterDimension; 11] = [
+    pub const ALL: [FilterDimension; 12] = [
         FilterDimension::Host,
         FilterDimension::Source,
         FilterDimension::Destination,
@@ -26,6 +27,7 @@ impl FilterDimension {
         FilterDimension::IpVersion,
         FilterDimension::PacketLength,
         FilterDimension::TrafficClass,
+        FilterDimension::IcmpType,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -41,6 +43,7 @@ impl FilterDimension {
             FilterDimension::IpVersion => "ip version",
             FilterDimension::PacketLength => "length",
             FilterDimension::TrafficClass => "traffic class",
+            FilterDimension::IcmpType => "icmp type",
         }
     }
 }
@@ -226,6 +229,7 @@ mod tests {
                 FilterDimension::IpVersion,
                 FilterDimension::PacketLength,
                 FilterDimension::TrafficClass,
+                FilterDimension::IcmpType,
             ]
         );
     }
@@ -243,6 +247,7 @@ mod tests {
         assert_eq!(FilterDimension::IpVersion.as_str(), "ip version");
         assert_eq!(FilterDimension::PacketLength.as_str(), "length");
         assert_eq!(FilterDimension::TrafficClass.as_str(), "traffic class");
+        assert_eq!(FilterDimension::IcmpType.as_str(), "icmp type");
     }
 
     #[test]

@@ -494,6 +494,11 @@ fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> V
                     candidates.insert(class.to_string());
                 }
             }
+            FilterDimension::IcmpType => {
+                if let Some(icmp_type) = packet_icmp_type(packet) {
+                    candidates.insert(icmp_type);
+                }
+            }
         }
     }
 
@@ -558,6 +563,9 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
         FilterDimension::TrafficClass => {
             packet_traffic_class(packet).is_some_and(|class| class == query)
         }
+        FilterDimension::IcmpType => packet_icmp_type(packet)
+            .as_deref()
+            .is_some_and(|icmp_type| icmp_type == query),
     }
 }
 
@@ -658,6 +666,39 @@ fn endpoint_traffic_class(endpoint: &str) -> Option<&'static str> {
     }
 
     Some("unicast")
+}
+
+fn packet_icmp_type(packet: &PacketSummary) -> Option<String> {
+    if !packet.protocol.eq_ignore_ascii_case("ICMP")
+        && !packet.protocol.eq_ignore_ascii_case("ICMP6")
+    {
+        return None;
+    }
+
+    icmp_type_from_summary(&packet.summary)
+}
+
+fn icmp_type_from_summary(summary: &str) -> Option<String> {
+    let trimmed = summary.trim();
+    let remainder = if let Some(rest) = trimmed.strip_prefix("ICMP6") {
+        rest
+    } else if let Some(rest) = trimmed.strip_prefix("ICMP") {
+        rest
+    } else {
+        return None;
+    };
+
+    let normalized = remainder.trim_start_matches([',', ':', ' ']).trim_start();
+    if normalized.is_empty() {
+        return None;
+    }
+
+    let type_label = normalized
+        .split(',')
+        .next()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    Some(type_label.to_ascii_lowercase())
 }
 
 fn endpoint_port(endpoint: &str) -> Option<String> {
@@ -802,6 +843,35 @@ mod tests {
                 protocol: "UDP".to_string(),
                 length: 300,
                 summary: "UDP, length 300".to_string(),
+            },
+        ]
+    }
+
+    fn sample_packets_with_icmp_types() -> Vec<PacketSummary> {
+        vec![
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                source: "10.0.0.12".to_string(),
+                destination: "1.1.1.1".to_string(),
+                protocol: "ICMP".to_string(),
+                length: 84,
+                summary: "ICMP echo request, id 1, seq 1, length 64".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                source: "1.1.1.1".to_string(),
+                destination: "10.0.0.12".to_string(),
+                protocol: "ICMP".to_string(),
+                length: 84,
+                summary: "ICMP echo reply, id 1, seq 1, length 64".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                source: "fe80::1".to_string(),
+                destination: "ff02::1:ff00:1".to_string(),
+                protocol: "ICMP6".to_string(),
+                length: 72,
+                summary: "ICMP6, neighbor solicitation, who has fe80::1, length 32".to_string(),
             },
         ]
     }
@@ -1193,6 +1263,42 @@ mod tests {
         assert_eq!(app.filter_expression(), "traffic class = broadcast");
         assert_eq!(app.packets().len(), 1);
         assert!(app.packets()[0].destination.starts_with("255.255.255.255"));
+    }
+
+    #[test]
+    fn icmp_type_popup_lists_unique_types() {
+        let mut app = App::with_packets(sample_packets_with_icmp_types(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::IcmpType);
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::IcmpType);
+
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("icmp type popup should expose candidates");
+        assert_eq!(
+            candidates,
+            &[
+                "echo reply".to_string(),
+                "echo request".to_string(),
+                "neighbor solicitation".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn icmp_type_filter_matches_selected_type_only() {
+        let mut app = App::with_packets(sample_packets_with_icmp_types(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::IcmpType);
+        app.open_filter_popup();
+        app.move_down();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "icmp type = echo request");
+        assert_eq!(app.packets().len(), 1);
+        assert!(app.packets()[0].summary.starts_with("ICMP echo request"));
     }
 
     #[test]
