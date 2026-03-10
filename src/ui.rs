@@ -508,8 +508,11 @@ fn render_date_time_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
         .fg(Color::LightYellow)
         .add_modifier(Modifier::BOLD);
     let inactive_label_style = Style::default();
-    let active_field_style = Style::default().fg(Color::Black).bg(Color::LightYellow);
-    let inactive_field_style = Style::default().fg(Color::Gray).add_modifier(Modifier::DIM);
+    let active_field_style = Style::default()
+        .fg(Color::Black)
+        .bg(Color::White)
+        .add_modifier(Modifier::BOLD);
+    let inactive_field_style = Style::default().fg(Color::DarkGray).bg(Color::White);
 
     let start_label_style = if active_field == Some(DateTimePopupField::Start) {
         active_label_style
