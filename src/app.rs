@@ -99,11 +99,6 @@ impl App {
         self.focus = FocusPane::PacketList;
     }
 
-    pub fn begin_filter_input_with_char(&mut self, ch: char) {
-        self.focus_filter_input();
-        self.insert_filter_input_char(ch);
-    }
-
     pub fn focus(&self) -> FocusPane {
         self.focus
     }
@@ -353,17 +348,6 @@ mod tests {
         app.backspace_filter_input();
 
         assert_eq!(app.filter_input(), "tc");
-    }
-
-    #[test]
-    fn begin_filter_input_with_char_switches_focus_and_updates_input() {
-        let mut app = App::new();
-        assert_eq!(app.focus(), FocusPane::FilterSelector);
-
-        app.begin_filter_input_with_char('u');
-
-        assert_eq!(app.focus(), FocusPane::FilterInput);
-        assert_eq!(app.filter_input(), "u");
     }
 
     #[test]
