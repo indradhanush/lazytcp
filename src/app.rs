@@ -466,6 +466,11 @@ fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> V
             FilterDimension::Protocol => {
                 candidates.insert(packet.protocol.to_ascii_lowercase());
             }
+            FilterDimension::TcpFlags => {
+                for flag in tcp_flags_from_summary(&packet.summary) {
+                    candidates.insert(flag.to_string());
+                }
+            }
         }
     }
 
@@ -511,6 +516,44 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
                 || endpoint_port(&packet.destination).is_some_and(|port| port == query)
         }
         FilterDimension::Protocol => packet.protocol.to_ascii_lowercase() == query,
+        FilterDimension::TcpFlags => tcp_flags_from_summary(&packet.summary)
+            .iter()
+            .any(|flag| *flag == query.as_str()),
+    }
+}
+
+fn tcp_flags_from_summary(summary: &str) -> Vec<&'static str> {
+    let Some(start) = summary.find("Flags [") else {
+        return Vec::new();
+    };
+    let remainder = &summary[start + "Flags [".len()..];
+    let Some(end) = remainder.find(']') else {
+        return Vec::new();
+    };
+
+    let mut flags = Vec::new();
+    for symbol in remainder[..end].chars() {
+        let Some(label) = tcp_flag_label(symbol) else {
+            continue;
+        };
+        flags.push(label);
+    }
+
+    flags
+}
+
+fn tcp_flag_label(symbol: char) -> Option<&'static str> {
+    match symbol {
+        'N' => Some("ns"),
+        'W' => Some("cwr"),
+        'E' => Some("ece"),
+        'U' => Some("urg"),
+        '.' => Some("ack"),
+        'P' => Some("psh"),
+        'R' => Some("rst"),
+        'S' => Some("syn"),
+        'F' => Some("fin"),
+        _ => None,
     }
 }
 
@@ -660,7 +703,7 @@ mod tests {
         }
 
         assert_eq!(app.selected_filter_dimension_index(), last_index);
-        assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::TcpFlags);
     }
 
     #[test]
@@ -796,6 +839,42 @@ mod tests {
 
         assert_eq!(app.filter_expression(), "protocol in [tcp, udp]");
         assert_eq!(app.packets().len(), 3);
+    }
+
+    #[test]
+    fn tcp_flags_popup_lists_unique_available_flags() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        for _ in 0..5 {
+            app.next_filter_dimension();
+        }
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::TcpFlags);
+
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("tcp flags popup should expose candidates");
+        assert_eq!(candidates, &["ack".to_string(), "syn".to_string()]);
+    }
+
+    #[test]
+    fn tcp_flags_filter_matches_packets_by_selected_flag() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        for _ in 0..5 {
+            app.next_filter_dimension();
+        }
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::TcpFlags);
+
+        app.open_filter_popup();
+        app.move_down();
+        assert_eq!(app.filter_popup_selected_index(), Some(1));
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "tcp flags = syn");
+        assert_eq!(app.packets().len(), 1);
+        assert!(app.packets()[0].summary.contains("Flags [S]"));
     }
 
     #[test]

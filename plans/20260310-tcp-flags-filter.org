@@ -1,0 +1,37 @@
+:PROPERTIES:
+:CATEGORY: lazytcp TCP Flags Filter
+:END:
+#+TITLE: lazytcp TCP Flags Filter
+
+* Objective
+Add a =tcp flags= filter category so operators can select TCP flags in the popup and apply them as interactive filters.
+
+* Requested Behavior
+- =Filter By= includes =tcp flags=.
+- Opening the popup on this category lists available TCP flag values from loaded packets.
+- Multi-select behavior remains consistent with existing categories.
+- Confirm applies filtering and updates the expression pane.
+
+* Scope
+In scope:
+- Add =TcpFlags= to filter dimensions.
+- Derive TCP flag candidates from packet summaries.
+- Match packets by selected TCP flag values.
+- Add tests for candidate extraction and filtering behavior.
+
+Out of scope:
+- Backend capture process changes.
+- New keybindings.
+
+* Architecture Slice
+- =src/domain.rs=
+  - Extend =FilterDimension= with =TcpFlags= and string mapping.
+- =src/app.rs=
+  - Add candidate extraction and packet-matching logic for TCP flags.
+  - Add tests covering popup candidates and filter expression semantics.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for tcp-flags filter slice.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.

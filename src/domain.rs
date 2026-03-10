@@ -5,15 +5,17 @@ pub enum FilterDimension {
     Destination,
     Port,
     Protocol,
+    TcpFlags,
 }
 
 impl FilterDimension {
-    pub const ALL: [FilterDimension; 5] = [
+    pub const ALL: [FilterDimension; 6] = [
         FilterDimension::Host,
         FilterDimension::Source,
         FilterDimension::Destination,
         FilterDimension::Port,
         FilterDimension::Protocol,
+        FilterDimension::TcpFlags,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -23,6 +25,7 @@ impl FilterDimension {
             FilterDimension::Destination => "destination",
             FilterDimension::Port => "port",
             FilterDimension::Protocol => "protocol",
+            FilterDimension::TcpFlags => "tcp flags",
         }
     }
 }
@@ -202,6 +205,7 @@ mod tests {
                 FilterDimension::Destination,
                 FilterDimension::Port,
                 FilterDimension::Protocol,
+                FilterDimension::TcpFlags,
             ]
         );
     }
@@ -213,6 +217,7 @@ mod tests {
         assert_eq!(FilterDimension::Destination.as_str(), "destination");
         assert_eq!(FilterDimension::Port.as_str(), "port");
         assert_eq!(FilterDimension::Protocol.as_str(), "protocol");
+        assert_eq!(FilterDimension::TcpFlags.as_str(), "tcp flags");
     }
 
     #[test]
