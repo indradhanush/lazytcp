@@ -420,11 +420,7 @@ fn focused_block(title: &str, is_focused: bool) -> Block<'_> {
         .borders(Borders::ALL)
         .title(title)
         .border_style(border_style)
-        .padding(if is_focused {
-            Padding::new(2, 2, 0, 0)
-        } else {
-            Padding::ZERO
-        })
+        .padding(Padding::new(2, 2, 0, 0))
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
@@ -478,7 +474,7 @@ mod tests {
         let focused_inner = focused_block("focused", true).inner(area);
         let unfocused_inner = focused_block("unfocused", false).inner(area);
 
-        assert!(focused_inner.width < unfocused_inner.width);
+        assert_eq!(focused_inner.width, unfocused_inner.width);
         assert_eq!(focused_inner.height, unfocused_inner.height);
     }
 }
