@@ -59,11 +59,9 @@ fn render_packet_list(frame: &mut Frame, app: &App, area: Rect) {
         })
         .collect();
 
+    let title = format!("Packets [{}]", app.packets().len());
     let list = List::new(items)
-        .block(focused_block(
-            "Packets",
-            app.focus() == FocusPane::PacketList,
-        ))
+        .block(focused_block(&title, app.focus() == FocusPane::PacketList))
         .highlight_style(
             Style::default()
                 .fg(Color::Black)
