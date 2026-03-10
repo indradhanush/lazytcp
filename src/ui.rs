@@ -5,6 +5,7 @@ use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wra
 use ratatui::Frame;
 
 use crate::app::{App, FocusPane};
+use crate::domain::{tcp_packet_details, PacketSummary, TcpPacketDetails};
 
 pub fn render(frame: &mut Frame, app: &App) {
     let root = Layout::default()
@@ -108,16 +109,7 @@ fn render_filter_selector(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_packet_detail(frame: &mut Frame, app: &App, area: Rect) {
     let lines = if let Some(packet) = app.selected_packet() {
-        vec![
-            Line::raw(format!("timestamp: {}", packet.timestamp)),
-            Line::raw(format!("source: {}", packet.source)),
-            Line::raw(format!("destination: {}", packet.destination)),
-            Line::raw(format!("protocol: {}", packet.protocol)),
-            Line::raw(format!("length: {} bytes", packet.length)),
-            Line::raw(""),
-            Line::raw("summary:"),
-            Line::raw(packet.summary.as_str()),
-        ]
+        render_packet_detail_component(packet)
     } else {
         vec![Line::raw("No packet selected")]
     };
@@ -130,6 +122,117 @@ fn render_packet_detail(frame: &mut Frame, app: &App, area: Rect) {
         .wrap(Wrap { trim: true });
 
     frame.render_widget(detail, area);
+}
+
+fn render_packet_detail_component(packet: &PacketSummary) -> Vec<Line<'static>> {
+    if let Some(details) = tcp_packet_details(packet) {
+        render_tcp_packet_visualizer(packet, &details)
+    } else {
+        render_default_packet_detail(packet)
+    }
+}
+
+fn render_tcp_packet_visualizer(
+    packet: &PacketSummary,
+    details: &TcpPacketDetails,
+) -> Vec<Line<'static>> {
+    let source_port = format_option(details.source_port.map(|port| port.to_string()));
+    let destination_port = format_option(details.destination_port.map(|port| port.to_string()));
+    let sequence_number = format_option(details.sequence_number.as_deref().map(str::to_string));
+    let acknowledgement_number = format_option(
+        details
+            .acknowledgement_number
+            .as_deref()
+            .map(str::to_string),
+    );
+    let data_offset = format_option(
+        details
+            .data_offset_words
+            .map(|words| format!("{words} words ({} bytes)", words as usize * 4)),
+    );
+    let reserved_bits = format_option(details.reserved_bits.as_deref().map(str::to_string));
+    let window_size = format_option(details.window_size.map(|size| size.to_string()));
+    let checksum = format_option(details.checksum.as_deref().map(str::to_string));
+    let urgent_pointer = format_option(details.urgent_pointer.map(|pointer| pointer.to_string()));
+    let options = format_option(details.options.as_deref().map(str::to_string));
+
+    vec![
+        Line::raw(format!("timestamp: {}", packet.timestamp)),
+        Line::raw(format!("source: {}", packet.source)),
+        Line::raw(format!("destination: {}", packet.destination)),
+        Line::raw(""),
+        Line::raw("TCP packet visualizer"),
+        Line::raw("+-----------------------------------------------------------+"),
+        Line::raw(format!(
+            "| Source Port: {:<16} | Destination Port: {:<15}|",
+            source_port, destination_port
+        )),
+        Line::raw("+-----------------------------------------------------------+"),
+        Line::raw(format!(
+            "| Sequence Number: {:<12} | Ack Number: {:<17}|",
+            sequence_number, acknowledgement_number
+        )),
+        Line::raw("+-----------------------------------------------------------+"),
+        Line::raw(format!(
+            "| Data Offset: {:<16} | Reserved: {:<19}|",
+            data_offset, reserved_bits
+        )),
+        Line::raw("+-----------------------------------------------------------+"),
+        Line::raw(format!(
+            "| Flags: NS={} CWR={} ECE={} URG={} ACK={} PSH={} RST={} SYN={} FIN={}     |",
+            bit(details.flags.ns),
+            bit(details.flags.cwr),
+            bit(details.flags.ece),
+            bit(details.flags.urg),
+            bit(details.flags.ack),
+            bit(details.flags.psh),
+            bit(details.flags.rst),
+            bit(details.flags.syn),
+            bit(details.flags.fin),
+        )),
+        Line::raw(format!("| Flags(raw): {:<47}|", details.flags.raw)),
+        Line::raw("+-----------------------------------------------------------+"),
+        Line::raw(format!(
+            "| Window: {:<21} | Checksum: {:<20}|",
+            window_size, checksum
+        )),
+        Line::raw(format!("| Urgent Pointer: {:<45}|", urgent_pointer)),
+        Line::raw("+-----------------------------------------------------------+"),
+        Line::raw(format!("| Options: {:<52}|", options)),
+        Line::raw(format!(
+            "| Payload Length: {:<45}|",
+            format!("{} bytes", details.payload_length)
+        )),
+        Line::raw("+-----------------------------------------------------------+"),
+        Line::raw(""),
+        Line::raw("summary:"),
+        Line::raw(packet.summary.clone()),
+    ]
+}
+
+fn render_default_packet_detail(packet: &PacketSummary) -> Vec<Line<'static>> {
+    vec![
+        Line::raw(format!("timestamp: {}", packet.timestamp)),
+        Line::raw(format!("source: {}", packet.source)),
+        Line::raw(format!("destination: {}", packet.destination)),
+        Line::raw(format!("protocol: {}", packet.protocol)),
+        Line::raw(format!("length: {} bytes", packet.length)),
+        Line::raw(""),
+        Line::raw("summary:"),
+        Line::raw(packet.summary.clone()),
+    ]
+}
+
+fn format_option(value: Option<String>) -> String {
+    value.unwrap_or_else(|| "-".to_string())
+}
+
+fn bit(value: bool) -> u8 {
+    if value {
+        1
+    } else {
+        0
+    }
 }
 
 fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
