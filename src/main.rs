@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::process;
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
@@ -189,6 +189,7 @@ fn handle_event(app: &mut App) -> AppResult<()> {
     if let Event::Key(key) = event::read()? {
         if key.kind == KeyEventKind::Press {
             match key.code {
+                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => app.quit(),
                 KeyCode::Char(ch) if app.focus() == FocusPane::FilterInput => {
                     app.insert_filter_input_char(ch)
                 }
