@@ -222,7 +222,7 @@ fn sync_date_time_cursor_mode(
     }
 
     if !*date_time_cursor_color_applied {
-        set_cursor_color_black(terminal)?;
+        set_cursor_color_grey(terminal)?;
         *date_time_cursor_color_applied = true;
     }
 
@@ -240,8 +240,10 @@ fn sync_date_time_cursor_mode(
     Ok(())
 }
 
-fn set_cursor_color_black(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
-    terminal.backend_mut().execute(Print("\x1b]12;black\x07"))?;
+fn set_cursor_color_grey(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+    terminal
+        .backend_mut()
+        .execute(Print("\x1b]12;#808080\x07"))?;
     Ok(())
 }
 
