@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fs::{self, File};
 use std::io::Write;
@@ -6,6 +7,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use lazytcp::api::{TcpdumpApi, TcpdumpReadRequest};
+use lazytcp::app::App;
 
 #[test]
 fn api_matches_tcpdump_contract_without_filter() -> Result<(), Box<dyn Error>> {
@@ -79,6 +81,38 @@ fn api_matches_tcpdump_contract_with_udp_filter() -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
+#[test]
+fn host_filter_candidates_match_tcpdump_contract() -> Result<(), Box<dyn Error>> {
+    if !tcpdump_available() {
+        eprintln!("skipping contract test: tcpdump is not installed");
+        return Ok(());
+    }
+
+    let pcap_path = fixture_path("contract-hosts");
+    write_fixture_pcap(&pcap_path)?;
+
+    let api = TcpdumpApi::default();
+    let packets = api.read_pcap(TcpdumpReadRequest {
+        pcap_path: &pcap_path,
+        filter_args: &[],
+    })?;
+
+    let mut app = App::with_packets(packets, String::new());
+    app.open_filter_popup();
+    let actual_hosts = app
+        .filter_popup_candidates()
+        .map(|candidates| candidates.to_vec())
+        .unwrap_or_default();
+
+    let direct_stdout = run_tcpdump(&pcap_path, &[])?;
+    let expected_hosts = tcpdump_host_candidates(&direct_stdout);
+
+    assert_eq!(actual_hosts, expected_hosts);
+
+    fs::remove_file(&pcap_path)?;
+    Ok(())
+}
+
 fn run_tcpdump(path: &Path, filter_args: &[&str]) -> Result<String, Box<dyn Error>> {
     let output = Command::new("tcpdump")
         .arg("-nn")
@@ -119,6 +153,60 @@ fn baseline_contract_rows(stdout: &str) -> Vec<(String, String, usize)> {
             ))
         })
         .collect()
+}
+
+fn tcpdump_host_candidates(stdout: &str) -> Vec<String> {
+    let mut hosts = BTreeSet::new();
+
+    for line in stdout.lines() {
+        let Some((_, payload)) = line.split_once(" IP ").or_else(|| line.split_once(" IP6 "))
+        else {
+            continue;
+        };
+
+        let (path_segment, _) = payload.split_once(": ").unwrap_or((payload, ""));
+        let Some((source, destination)) = path_segment.split_once(" > ") else {
+            continue;
+        };
+
+        hosts.insert(normalize_host_endpoint(source.trim()));
+        hosts.insert(normalize_host_endpoint(
+            destination.trim().trim_end_matches(':'),
+        ));
+    }
+
+    hosts.into_iter().collect()
+}
+
+fn normalize_host_endpoint(endpoint: &str) -> String {
+    if let Some((host, port)) = endpoint.rsplit_once('.') {
+        if !host.is_empty()
+            && !port.is_empty()
+            && port.chars().all(|ch| ch.is_ascii_digit())
+            && (host.contains(':') || is_ipv4_address(host))
+        {
+            return host.to_ascii_lowercase();
+        }
+    }
+
+    endpoint.to_ascii_lowercase()
+}
+
+fn is_ipv4_address(value: &str) -> bool {
+    let mut parts = value.split('.');
+    let mut count = 0;
+
+    for part in parts.by_ref() {
+        count += 1;
+        if part.is_empty() || !part.chars().all(|ch| ch.is_ascii_digit()) {
+            return false;
+        }
+        if part.parse::<u8>().is_err() {
+            return false;
+        }
+    }
+
+    count == 4
 }
 
 fn parse_length(summary: &str) -> Option<usize> {
@@ -174,8 +262,14 @@ fn write_fixture_pcap(path: &Path) -> Result<(), Box<dyn Error>> {
         0x0C, 0x08, 0x08, 0x08, 0x08, 0x85, 0xA3, 0x00, 0x35, 0x00, 0x08, 0x00, 0x00,
     ];
 
+    let icmp_packet: [u8; 28] = [
+        0x45, 0x00, 0x00, 0x1C, 0x00, 0x03, 0x40, 0x00, 0x40, 0x01, 0x00, 0x00, 0x0A, 0x00, 0x00,
+        0x0C, 0x01, 0x01, 0x01, 0x01, 0x08, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01,
+    ];
+
     write_packet_record(&mut file, 1, 1_000, &tcp_packet)?;
     write_packet_record(&mut file, 2, 2_000, &udp_packet)?;
+    write_packet_record(&mut file, 3, 3_000, &icmp_packet)?;
 
     Ok(())
 }

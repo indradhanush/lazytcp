@@ -1,0 +1,40 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Host Filter Parity Fix
+:END:
+#+TITLE: lazytcp Host Filter Parity Fix
+
+* Objective
+Fix host extraction so plain IPv4 addresses are not truncated (for example =1.1.1.1= must remain intact) and add parity tests to prevent regressions.
+
+* Findings From capture-20260309-221720.pcap
+- Expected host missing in TUI list: =1.1.1.1=
+- Extra hosts shown by current TUI logic: =1.1.1=, =192.168.0=
+- Root cause: host parsing strips any numeric suffix after the last dot, including plain IPv4 octets.
+
+* Scope
+In scope:
+- Tighten endpoint host/port parsing rules in =src/app.rs=.
+- Add tests that cover plain IPv4 endpoints without ports.
+- Add a parity contract test using a pcap fixture with a non-port IPv4 endpoint baseline from =tcpdump=.
+
+Out of scope:
+- UI layout changes.
+- Capture backend process changes.
+
+* Architecture Slice
+- =src/app.rs=
+  - Replace naive last-dot stripping with host-type-aware port stripping.
+  - Reuse parsing rule for both host and port extraction.
+  - Add unit tests for plain IPv4 endpoint handling.
+- =tests/contract_tcpdump_api.rs=
+  - Add fixture packet without transport port (ICMP).
+  - Add parity assertion for host candidate extraction against tcpdump baseline.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for host filter parity bugfix.
+- 2026-03-10: Direct =tcpdump= comparison on =capture-20260309-221720.pcap= confirmed mismatch:
+  - missing: =1.1.1.1=
+  - extra: =1.1.1=, =192.168.0=
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.

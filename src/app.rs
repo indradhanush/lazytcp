@@ -468,20 +468,43 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
 }
 
 fn endpoint_host(endpoint: &str) -> String {
-    if let Some((host, port)) = endpoint.rsplit_once('.') {
-        if !host.is_empty() && port.chars().all(|ch| ch.is_ascii_digit()) {
-            return host.to_ascii_lowercase();
-        }
-    }
-    endpoint.to_ascii_lowercase()
+    split_endpoint_host_port(endpoint)
+        .map(|(host, _)| host.to_ascii_lowercase())
+        .unwrap_or_else(|| endpoint.to_ascii_lowercase())
 }
 
 fn endpoint_port(endpoint: &str) -> Option<String> {
+    split_endpoint_host_port(endpoint).map(|(_, port)| port.to_string())
+}
+
+fn split_endpoint_host_port(endpoint: &str) -> Option<(&str, &str)> {
     let (host, port) = endpoint.rsplit_once('.')?;
-    if !host.is_empty() && port.chars().all(|ch| ch.is_ascii_digit()) {
-        return Some(port.to_string());
+    if host.is_empty() || port.is_empty() || !port.chars().all(|ch| ch.is_ascii_digit()) {
+        return None;
     }
+
+    if host.contains(':') || is_ipv4_address(host) {
+        return Some((host, port));
+    }
+
     None
+}
+
+fn is_ipv4_address(value: &str) -> bool {
+    let mut parts = value.split('.');
+    let mut count = 0;
+
+    for part in parts.by_ref() {
+        count += 1;
+        if part.is_empty() || !part.chars().all(|ch| ch.is_ascii_digit()) {
+            return false;
+        }
+        if part.parse::<u8>().is_err() {
+            return false;
+        }
+    }
+
+    count == 4
 }
 
 impl Default for App {
@@ -494,7 +517,7 @@ impl Default for App {
 mod tests {
     use crate::domain::{FilterDimension, PacketSummary};
 
-    use super::{App, FocusPane};
+    use super::{endpoint_host, endpoint_port, App, FocusPane};
 
     fn sample_packets() -> Vec<PacketSummary> {
         vec![
@@ -824,5 +847,40 @@ mod tests {
 
         assert_eq!(app.filter_expression(), "");
         assert_eq!(app.packets().len(), 3);
+    }
+
+    #[test]
+    fn endpoint_host_keeps_plain_ipv4_without_port() {
+        assert_eq!(endpoint_host("1.1.1.1"), "1.1.1.1");
+        assert_eq!(endpoint_host("192.168.0.242"), "192.168.0.242");
+    }
+
+    #[test]
+    fn endpoint_port_ignores_plain_ipv4_without_port() {
+        assert_eq!(endpoint_port("1.1.1.1"), None);
+        assert_eq!(endpoint_port("192.168.0.242"), None);
+    }
+
+    #[test]
+    fn host_popup_includes_full_plain_ipv4_hosts() {
+        let packets = vec![PacketSummary {
+            timestamp: "1970-01-01 00:00:04.004000".to_string(),
+            source: "192.168.0.242".to_string(),
+            destination: "1.1.1.1".to_string(),
+            protocol: "ICMP".to_string(),
+            length: 84,
+            summary: "ICMP echo request".to_string(),
+        }];
+        let mut app = App::with_packets(packets, String::new());
+
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("host popup should expose candidates");
+
+        assert_eq!(
+            candidates,
+            &["1.1.1.1".to_string(), "192.168.0.242".to_string()]
+        );
     }
 }
