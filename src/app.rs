@@ -441,6 +441,13 @@ fn build_filter_expression(
 }
 
 fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> Vec<String> {
+    if dimension == FilterDimension::TcpFlags {
+        return all_tcp_flag_labels()
+            .iter()
+            .map(|label| (*label).to_string())
+            .collect();
+    }
+
     let mut candidates = BTreeSet::new();
 
     for packet in packets {
@@ -476,11 +483,7 @@ fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> V
             FilterDimension::Protocol => {
                 candidates.insert(packet.protocol.to_ascii_lowercase());
             }
-            FilterDimension::TcpFlags => {
-                for flag in tcp_flags_from_summary(&packet.summary) {
-                    candidates.insert(flag.to_string());
-                }
-            }
+            FilterDimension::TcpFlags => {}
             FilterDimension::IpVersion => {
                 if let Some(version) = packet_ip_version(packet) {
                     candidates.insert(version.to_string());
@@ -592,6 +595,10 @@ fn tcp_flags_from_summary(summary: &str) -> Vec<&'static str> {
     }
 
     flags
+}
+
+fn all_tcp_flag_labels() -> [&'static str; 9] {
+    ["ns", "cwr", "ece", "urg", "ack", "psh", "rst", "syn", "fin"]
 }
 
 fn tcp_flag_label(symbol: char) -> Option<&'static str> {
@@ -1277,7 +1284,20 @@ mod tests {
         let candidates = app
             .filter_popup_candidates()
             .expect("tcp flags popup should expose candidates");
-        assert_eq!(candidates, &["ack".to_string(), "syn".to_string()]);
+        assert_eq!(
+            candidates,
+            &[
+                "ns".to_string(),
+                "cwr".to_string(),
+                "ece".to_string(),
+                "urg".to_string(),
+                "ack".to_string(),
+                "psh".to_string(),
+                "rst".to_string(),
+                "syn".to_string(),
+                "fin".to_string(),
+            ]
+        );
     }
 
     #[test]
@@ -1288,8 +1308,16 @@ mod tests {
         assert_eq!(app.selected_filter_dimension(), FilterDimension::TcpFlags);
 
         app.open_filter_popup();
-        app.move_down();
-        assert_eq!(app.filter_popup_selected_index(), Some(1));
+        let syn_index = app
+            .filter_popup_candidates()
+            .expect("tcp flags popup should expose candidates")
+            .iter()
+            .position(|candidate| candidate == "syn")
+            .expect("syn flag should be present");
+        for _ in 0..syn_index {
+            app.move_down();
+        }
+        assert_eq!(app.filter_popup_selected_index(), Some(syn_index));
         app.toggle_filter_popup_selection();
         app.confirm_filter_popup();
 
