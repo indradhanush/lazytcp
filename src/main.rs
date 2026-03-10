@@ -190,9 +190,10 @@ fn handle_event(app: &mut App) -> AppResult<()> {
         if key.kind == KeyEventKind::Press {
             match key.code {
                 KeyCode::Char('q') => app.quit(),
-                KeyCode::Char('j') | KeyCode::Down => app.next_packet(),
-                KeyCode::Char('k') | KeyCode::Up => app.previous_packet(),
+                KeyCode::Char('j') | KeyCode::Down => app.move_down(),
+                KeyCode::Char('k') | KeyCode::Up => app.move_up(),
                 KeyCode::Tab => app.cycle_focus(),
+                KeyCode::BackTab => app.reverse_cycle_focus(),
                 _ => {}
             }
         }

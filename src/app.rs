@@ -3,6 +3,7 @@ use crate::domain::{FilterDimension, PacketSummary};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FocusPane {
+    FilterSelector,
     PacketList,
     FilterInput,
     PacketDetail,
@@ -108,11 +109,37 @@ impl App {
         self.selected_filter_dimension = self.selected_filter_dimension.saturating_sub(1);
     }
 
+    pub fn move_down(&mut self) {
+        match self.focus {
+            FocusPane::FilterSelector => self.next_filter_dimension(),
+            FocusPane::PacketList => self.next_packet(),
+            FocusPane::FilterInput | FocusPane::PacketDetail => {}
+        }
+    }
+
+    pub fn move_up(&mut self) {
+        match self.focus {
+            FocusPane::FilterSelector => self.previous_filter_dimension(),
+            FocusPane::PacketList => self.previous_packet(),
+            FocusPane::FilterInput | FocusPane::PacketDetail => {}
+        }
+    }
+
     pub fn cycle_focus(&mut self) {
+        self.focus = match self.focus {
+            FocusPane::PacketList => FocusPane::FilterSelector,
+            FocusPane::FilterSelector => FocusPane::PacketDetail,
+            FocusPane::PacketDetail => FocusPane::FilterInput,
+            FocusPane::FilterInput => FocusPane::PacketList,
+        };
+    }
+
+    pub fn reverse_cycle_focus(&mut self) {
         self.focus = match self.focus {
             FocusPane::PacketList => FocusPane::FilterInput,
             FocusPane::FilterInput => FocusPane::PacketDetail,
-            FocusPane::PacketDetail => FocusPane::PacketList,
+            FocusPane::PacketDetail => FocusPane::FilterSelector,
+            FocusPane::FilterSelector => FocusPane::PacketList,
         };
     }
 }
@@ -156,10 +183,13 @@ mod tests {
         assert_eq!(app.focus(), FocusPane::PacketList);
 
         app.cycle_focus();
-        assert_eq!(app.focus(), FocusPane::FilterInput);
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
 
         app.cycle_focus();
         assert_eq!(app.focus(), FocusPane::PacketDetail);
+
+        app.cycle_focus();
+        assert_eq!(app.focus(), FocusPane::FilterInput);
 
         app.cycle_focus();
         assert_eq!(app.focus(), FocusPane::PacketList);
@@ -213,5 +243,43 @@ mod tests {
 
         assert_eq!(app.selected_filter_dimension_index(), 0);
         assert_eq!(app.selected_filter_dimension(), FilterDimension::Host);
+    }
+
+    #[test]
+    fn move_down_in_packet_list_focus_advances_packet_selection() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        app.move_down();
+
+        assert_eq!(app.selected_packet_index(), 1);
+    }
+
+    #[test]
+    fn move_down_in_filter_selector_focus_advances_filter_selection() {
+        let mut app = App::new();
+        app.cycle_focus();
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+
+        app.move_down();
+
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Source);
+    }
+
+    #[test]
+    fn reverse_cycle_focus_wraps_back_to_packet_list() {
+        let mut app = App::new();
+        assert_eq!(app.focus(), FocusPane::PacketList);
+
+        app.reverse_cycle_focus();
+        assert_eq!(app.focus(), FocusPane::FilterInput);
+
+        app.reverse_cycle_focus();
+        assert_eq!(app.focus(), FocusPane::PacketDetail);
+
+        app.reverse_cycle_focus();
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+
+        app.reverse_cycle_focus();
+        assert_eq!(app.focus(), FocusPane::PacketList);
     }
 }

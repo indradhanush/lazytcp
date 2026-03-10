@@ -21,11 +21,16 @@ pub fn render(frame: &mut Frame, app: &App) {
 
     let body = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+        .constraints([
+            Constraint::Length(18),
+            Constraint::Percentage(52),
+            Constraint::Percentage(48),
+        ])
         .split(root[1]);
 
-    render_packet_list(frame, app, body[0]);
-    render_packet_detail(frame, app, body[1]);
+    render_filter_selector(frame, app, body[0]);
+    render_packet_list(frame, app, body[1]);
+    render_packet_detail(frame, app, body[2]);
     render_filter_bar(frame, app, root[2]);
     render_footer(frame, root[3]);
 }
@@ -75,6 +80,34 @@ fn render_packet_list(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_stateful_widget(list, area, &mut state);
 }
 
+fn render_filter_selector(frame: &mut Frame, app: &App, area: Rect) {
+    let items: Vec<ListItem> = app
+        .filter_dimensions()
+        .iter()
+        .map(|dimension| ListItem::new(Line::raw(dimension.as_str())))
+        .collect();
+
+    let list = List::new(items)
+        .block(focused_block(
+            "Filter Type",
+            app.focus() == FocusPane::FilterSelector,
+        ))
+        .highlight_style(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::LightBlue)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(">> ");
+
+    let mut state = ListState::default();
+    if !app.filter_dimensions().is_empty() {
+        state.select(Some(app.selected_filter_dimension_index()));
+    }
+
+    frame.render_stateful_widget(list, area, &mut state);
+}
+
 fn render_packet_detail(frame: &mut Frame, app: &App, area: Rect) {
     let lines = if let Some(packet) = app.selected_packet() {
         vec![
@@ -102,8 +135,14 @@ fn render_packet_detail(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
-    let filter = Paragraph::new(app.filter_input()).block(focused_block(
-        "Filter",
+    let filter_display = format!(
+        "{}: {}",
+        app.selected_filter_dimension().as_str(),
+        app.filter_input()
+    );
+
+    let filter = Paragraph::new(filter_display).block(focused_block(
+        "Filter Expression",
         app.focus() == FocusPane::FilterInput,
     ));
 
@@ -111,8 +150,9 @@ fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_footer(frame: &mut Frame, area: Rect) {
-    let footer =
-        Paragraph::new("q: quit | j/down: next packet | k/up: previous packet | tab: cycle focus");
+    let footer = Paragraph::new(
+        "q: quit | j/k or arrows: move selection in focused list | tab/shift+tab: cycle focus",
+    );
     frame.render_widget(footer, area);
 }
 
