@@ -105,26 +105,37 @@ Acceptance criteria:
 - Core verification is executable through the library API; no interactive TUI driving is required for automated checks.
 - User-facing error states are explicit and recoverable.
 
-* Progress Snapshot (2026-03-10)
+* Progress Snapshot (2026-03-10, updated)
 - M1 status: done.
   - Implemented terminal lifecycle, event loop wiring, and baseline key navigation (=q=, =j/down=, =k/up=, =tab=).
 - M2 status: in progress.
   - Capture trait scaffolding exists and runtime currently loads from a required =.pcap= file through the API.
   - Live streaming capture integration from a running backend is not implemented yet.
-- M3 status: not started.
-  - Interactive in-session filter editing/re-apply in the TUI is still pending.
+- M3 status: done (pcap-backed session flow).
+  - Added interactive filter workflow with left =Filter By= pane, popup value picker, multi-select toggles, category clear/all clear, and expression rendering.
+  - Active filters are preserved across dimensions and applied with AND semantics without restarting the app.
 - M4 status: in progress.
-  - Packet list selection and detail pane rendering are implemented for loaded packet data.
-  - Behavior while a live capture stream is active is pending with M2.
+  - Packet list selection and detail pane rendering are implemented for loaded packet data, including TCP structure visualization with non-TCP fallback.
+  - Behavior while a live capture stream is active is still pending with M2.
 - M5 status: in progress.
-  - API contract tests against =tcpdump= with generated =.pcap= fixtures are implemented and passing.
-  - Additional unit coverage for full filter model/normalization and capture error-path hardening remains.
+  - API contract tests against =tcpdump= with generated =.pcap= fixtures are implemented and passing, including host-candidate parity coverage.
+  - Additional test hardening tied to a real streaming capture backend remains pending with M2.
+  - Source-based coverage workflow and artifacts are in place via =make coverage=.
+
+Overall finding:
+- Initial phase completion is currently gated by M2 (live streaming backend). M4/M5 have substantial progress but still depend on M2 for full acceptance.
 
 Current implemented baseline:
 - Project renamed to =lazytcp=.
 - Runtime requires =lazytcp <pcap-file> [tcpdump-filter...]= and no longer depends on mock runtime rows.
 - CLI error UX for missing/invalid args is user-friendly (usage/help output, explicit exit codes).
 - =make= runs =cargo fmt=, =cargo test=, and =cargo check=.
+- Left =Filter By= pane with host/source/destination/port/protocol selection and active indicators.
+- Popup-driven filter value selection with multi-select apply/cancel behavior.
+- Persistent per-dimension filters combined with AND semantics in the filter expression pane.
+- Keybindings help popup (=?=) for in-context control discovery.
+- Host parsing parity fix for plain IPv4 endpoints in filter candidates.
+- TCP packet detail visualization added for selected TCP packets.
 
 * Execution Order
 1. M1 app shell and input loop.
@@ -172,3 +183,8 @@ Record outcomes here as milestones are completed.
 - 2026-03-10: Removed milestone/placeholder wording from runtime UI strings.
 - 2026-03-10: Added =Makefile= default target to run =cargo fmt=, =cargo test=, and =cargo check=.
 - 2026-03-10: =make= passed.
+- 2026-03-10: Added left filter selector pane and popup-based multi-select filter workflow with active-state indicator and persistent AND semantics across dimensions.
+- 2026-03-10: Added keybindings popup opened via =?=.
+- 2026-03-10: Added TCP packet detail visualization for TCP packets with non-TCP fallback.
+- 2026-03-10: Fixed host candidate extraction parity for plain IPv4 endpoints (for example =1.1.1.1=) and added parity coverage with ICMP fixture data.
+- 2026-03-10: Added source-based Rust coverage workflow (scripts + docs); =make coverage= passed with summary, LCOV, and HTML artifacts.
