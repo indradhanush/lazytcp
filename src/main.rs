@@ -9,7 +9,7 @@ use crossterm::terminal::{
 };
 use crossterm::ExecutableCommand;
 use lazytcp::api::{TcpdumpApi, TcpdumpReadRequest};
-use lazytcp::app::App;
+use lazytcp::app::{App, FocusPane};
 use lazytcp::domain::PacketSummary;
 use lazytcp::ui;
 use ratatui::backend::CrosstermBackend;
@@ -189,7 +189,13 @@ fn handle_event(app: &mut App) -> AppResult<()> {
     if let Event::Key(key) = event::read()? {
         if key.kind == KeyEventKind::Press {
             match key.code {
-                KeyCode::Char('q') => app.quit(),
+                KeyCode::Char('q') if app.focus() != FocusPane::FilterInput => app.quit(),
+                KeyCode::Char(ch) if app.focus() == FocusPane::FilterInput => {
+                    app.insert_filter_input_char(ch)
+                }
+                KeyCode::Backspace if app.focus() == FocusPane::FilterInput => {
+                    app.backspace_filter_input()
+                }
                 KeyCode::Char('j') | KeyCode::Down => app.move_down(),
                 KeyCode::Char('k') | KeyCode::Up => app.move_up(),
                 KeyCode::Tab => app.cycle_focus(),

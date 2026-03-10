@@ -77,6 +77,14 @@ impl App {
         &self.filter_input
     }
 
+    pub fn insert_filter_input_char(&mut self, ch: char) {
+        self.filter_input.push(ch);
+    }
+
+    pub fn backspace_filter_input(&mut self) {
+        self.filter_input.pop();
+    }
+
     pub fn focus(&self) -> FocusPane {
         self.focus
     }
@@ -243,6 +251,24 @@ mod tests {
 
         assert_eq!(app.selected_filter_dimension_index(), 0);
         assert_eq!(app.selected_filter_dimension(), FilterDimension::Host);
+    }
+
+    #[test]
+    fn insert_filter_input_char_appends_text() {
+        let mut app = App::new();
+        app.insert_filter_input_char('u');
+        app.insert_filter_input_char('d');
+        app.insert_filter_input_char('p');
+
+        assert_eq!(app.filter_input(), "udp");
+    }
+
+    #[test]
+    fn backspace_filter_input_removes_last_character() {
+        let mut app = App::with_packets(Vec::new(), "tcp".to_string());
+        app.backspace_filter_input();
+
+        assert_eq!(app.filter_input(), "tc");
     }
 
     #[test]
