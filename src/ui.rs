@@ -497,52 +497,98 @@ fn render_date_time_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
     let start = app
         .filter_popup_date_time_start_input()
         .map(str::to_string)
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| "<none>".to_string());
+        .unwrap_or_default();
     let end = app
         .filter_popup_date_time_end_input()
         .map(str::to_string)
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| "<none>".to_string());
+        .unwrap_or_default();
     let active_field = app.filter_popup_date_time_active_field();
 
-    let start_style = if active_field == Some(DateTimePopupField::Start) {
-        Style::default()
-            .fg(Color::LightYellow)
-            .add_modifier(Modifier::BOLD)
+    let active_label_style = Style::default()
+        .fg(Color::LightYellow)
+        .add_modifier(Modifier::BOLD);
+    let inactive_label_style = Style::default();
+    let active_field_style = Style::default().fg(Color::Black).bg(Color::LightYellow);
+    let inactive_field_style = Style::default().fg(Color::Gray).add_modifier(Modifier::DIM);
+
+    let start_label_style = if active_field == Some(DateTimePopupField::Start) {
+        active_label_style
     } else {
-        Style::default()
+        inactive_label_style
     };
-    let end_style = if active_field == Some(DateTimePopupField::End) {
-        Style::default()
-            .fg(Color::LightYellow)
-            .add_modifier(Modifier::BOLD)
+    let end_label_style = if active_field == Some(DateTimePopupField::End) {
+        active_label_style
     } else {
-        Style::default()
+        inactive_label_style
+    };
+
+    let popup_footer = Line::raw(
+        "type time | tab/j/k/\u{2191}/\u{2193} switch field | backspace delete | c clear | enter apply | esc cancel",
+    )
+    .alignment(Alignment::Right);
+    let block = focused_block("Set Date Time Range", true).title_bottom(popup_footer);
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    if inner.width == 0 || inner.height == 0 {
+        return;
+    }
+
+    let field_prefix = "Start: ";
+    let field_width = inner.width.saturating_sub(field_prefix.len() as u16) as usize;
+    let (start_field_text, start_cursor_col) = input_field_display(&start, field_width);
+    let (end_field_text, end_cursor_col) = input_field_display(&end, field_width);
+
+    let start_field_style = if active_field == Some(DateTimePopupField::Start) {
+        active_field_style
+    } else {
+        inactive_field_style
+    };
+    let end_field_style = if active_field == Some(DateTimePopupField::End) {
+        active_field_style
+    } else {
+        inactive_field_style
     };
 
     let lines = vec![
         Line::raw("Set optional inclusive bounds for packet timestamps."),
         Line::raw(""),
         Line::from(vec![
-            Span::styled("Start: ", start_style),
-            Span::styled(start.clone(), start_style),
+            Span::styled(field_prefix, start_label_style),
+            Span::styled(start_field_text, start_field_style),
         ]),
         Line::from(vec![
-            Span::styled("End:   ", end_style),
-            Span::styled(end.clone(), end_style),
+            Span::styled("End:   ", end_label_style),
+            Span::styled(end_field_text, end_field_style),
         ]),
         Line::raw(""),
         Line::raw("Format example: 2026-03-09 22:17:20.900000"),
     ];
 
-    let popup_footer =
-        Line::raw("type time | tab/j/k/↑/↓ switch field | backspace delete | c clear | enter apply | esc cancel")
-            .alignment(Alignment::Right);
-    let popup = Paragraph::new(lines)
-        .block(focused_block("Set Date Time Range", true).title_bottom(popup_footer))
-        .wrap(Wrap { trim: true });
-    frame.render_widget(popup, popup_area);
+    let popup = Paragraph::new(lines).wrap(Wrap { trim: false });
+    frame.render_widget(popup, inner);
+
+    let (cursor_line_offset, cursor_col) = if active_field == Some(DateTimePopupField::End) {
+        (3_u16, end_cursor_col as u16)
+    } else {
+        (2_u16, start_cursor_col as u16)
+    };
+    let max_cursor_x = inner.x + inner.width.saturating_sub(1);
+    let cursor_x = (inner.x + field_prefix.len() as u16 + cursor_col).min(max_cursor_x);
+    let cursor_y = (inner.y + cursor_line_offset).min(inner.y + inner.height.saturating_sub(1));
+    frame.set_cursor_position((cursor_x, cursor_y));
+}
+
+fn input_field_display(value: &str, width: usize) -> (String, usize) {
+    if width == 0 {
+        return (String::new(), 0);
+    }
+
+    let chars: Vec<char> = value.chars().collect();
+    let start_index = chars.len().saturating_sub(width);
+    let visible: String = chars[start_index..].iter().collect();
+    let cursor_col = visible.chars().count();
+    (format!("{visible:<width$}"), cursor_col)
 }
 
 fn render_keybindings_popup(frame: &mut Frame, app: &App, area: Rect) {
