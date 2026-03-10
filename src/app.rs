@@ -237,7 +237,7 @@ impl App {
             if popup.candidates.is_empty() {
                 return;
             }
-            popup.highlighted_index = (popup.highlighted_index + 1).min(popup.candidates.len() - 1);
+            popup.highlighted_index = (popup.highlighted_index + 1) % popup.candidates.len();
             return;
         }
 
@@ -250,7 +250,14 @@ impl App {
 
     pub fn move_up(&mut self) {
         if let Some(popup) = self.filter_popup.as_mut() {
-            popup.highlighted_index = popup.highlighted_index.saturating_sub(1);
+            if popup.candidates.is_empty() {
+                return;
+            }
+            popup.highlighted_index = if popup.highlighted_index == 0 {
+                popup.candidates.len() - 1
+            } else {
+                popup.highlighted_index - 1
+            };
             return;
         }
 
@@ -585,6 +592,31 @@ mod tests {
         assert_eq!(app.filter_expression(), "host = 8.8.8.8");
         assert_eq!(app.packets().len(), 1);
         assert_eq!(app.packets()[0].destination, "8.8.8.8.53");
+    }
+
+    #[test]
+    fn popup_move_down_wraps_from_last_item_to_first() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        app.open_filter_popup();
+        app.move_down();
+        app.move_down();
+        app.move_down();
+        assert_eq!(app.filter_popup_selected_index(), Some(3));
+
+        app.move_down();
+        assert_eq!(app.filter_popup_selected_index(), Some(0));
+    }
+
+    #[test]
+    fn popup_move_up_wraps_from_first_item_to_last() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        app.open_filter_popup();
+        assert_eq!(app.filter_popup_selected_index(), Some(0));
+
+        app.move_up();
+        assert_eq!(app.filter_popup_selected_index(), Some(3));
     }
 
     #[test]
