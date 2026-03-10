@@ -97,6 +97,27 @@ Acceptance criteria:
 - Core verification is executable through the library API; no interactive TUI driving is required for automated checks.
 - User-facing error states are explicit and recoverable.
 
+* Progress Snapshot (2026-03-10)
+- M1 status: done.
+  - Implemented terminal lifecycle, event loop wiring, and baseline key navigation (=q=, =j/down=, =k/up=, =tab=).
+- M2 status: in progress.
+  - Capture trait scaffolding exists and runtime currently loads from a required =.pcap= file through the API.
+  - Live streaming capture integration from a running backend is not implemented yet.
+- M3 status: not started.
+  - Interactive in-session filter editing/re-apply in the TUI is still pending.
+- M4 status: in progress.
+  - Packet list selection and detail pane rendering are implemented for loaded packet data.
+  - Behavior while a live capture stream is active is pending with M2.
+- M5 status: in progress.
+  - API contract tests against =tcpdump= with generated =.pcap= fixtures are implemented and passing.
+  - Additional unit coverage for full filter model/normalization and capture error-path hardening remains.
+
+Current implemented baseline:
+- Project renamed to =lazytcp=.
+- Runtime requires =lazytcp <pcap-file> [tcpdump-filter...]= and no longer depends on mock runtime rows.
+- CLI error UX for missing/invalid args is user-friendly (usage/help output, explicit exit codes).
+- =make= runs =cargo fmt=, =cargo test=, and =cargo check=.
+
 * Execution Order
 1. M1 app shell and input loop.
 2. M2 streaming capture path.
@@ -140,3 +161,6 @@ Record outcomes here as milestones are completed.
 - 2026-03-09: =cargo fmt= passed (after rename updates).
 - 2026-03-09: =cargo test= passed.
 - 2026-03-09: =cargo check= passed.
+- 2026-03-10: Removed milestone/placeholder wording from runtime UI strings.
+- 2026-03-10: Added =Makefile= default target to run =cargo fmt=, =cargo test=, and =cargo check=.
+- 2026-03-10: =make= passed.
