@@ -2,7 +2,7 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{
-    Block, Borders, Clear, List, ListItem, ListState, Padding, Paragraph, Wrap,
+    Block, BorderType, Borders, Clear, List, ListItem, ListState, Padding, Paragraph, Wrap,
 };
 use ratatui::Frame;
 
@@ -419,6 +419,11 @@ fn focused_block(title: &str, is_focused: bool) -> Block<'_> {
     Block::default()
         .borders(Borders::ALL)
         .title(title)
+        .border_type(if is_focused {
+            BorderType::Thick
+        } else {
+            BorderType::Plain
+        })
         .border_style(border_style)
         .padding(Padding::new(2, 2, 0, 0))
 }
