@@ -3,6 +3,14 @@
 * Objective
 Deliver a usable first slice of =lazytcp= that makes live packet exploration easier than raw =tcpdump=/=tshark= usage by supporting fast, in-session filter changes.
 
+* Long-Term Goal
+- Run a =tcpdump= command through =lazytcp= and live-watch packets with interactive filtering in one operator flow.
+- Keep =tcpdump= as the packet capture engine while =lazytcp= provides the interactive UX layer.
+
+Implementation direction:
+- =tcpdump= writes packet data to a capture file.
+- =lazytcp= continuously reads/tails that file and renders/updates packet views and filters live.
+
 * Scope
 In scope for this phase:
 - Single local capture session.
