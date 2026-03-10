@@ -145,6 +145,12 @@ fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
     ));
 
     frame.render_widget(filter, area);
+
+    if app.focus() == FocusPane::FilterInput {
+        if let Some((x, y)) = filter_cursor_position(area, app) {
+            frame.set_cursor_position((x, y));
+        }
+    }
 }
 
 fn render_footer(frame: &mut Frame, area: Rect) {
@@ -167,4 +173,50 @@ fn focused_block(title: &str, is_focused: bool) -> Block<'_> {
         .borders(Borders::ALL)
         .title(title)
         .border_style(border_style)
+}
+
+fn filter_cursor_position(area: Rect, app: &App) -> Option<(u16, u16)> {
+    let inner = area.inner(ratatui::layout::Margin {
+        horizontal: 1,
+        vertical: 1,
+    });
+    if inner.width == 0 || inner.height == 0 {
+        return None;
+    }
+
+    let prefix = format!("{}: ", app.selected_filter_dimension().as_str());
+    let cursor_col = prefix.chars().count() + app.filter_input().chars().count();
+
+    let max_col = inner.width.saturating_sub(1) as usize;
+    let clamped_col = cursor_col.min(max_col) as u16;
+    Some((inner.x.saturating_add(clamped_col), inner.y))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::filter_cursor_position;
+    use crate::app::App;
+    use ratatui::layout::Rect;
+
+    #[test]
+    fn filter_cursor_position_is_inside_filter_bar_inner_area() {
+        let mut app = App::new();
+        app.focus_filter_input();
+        app.insert_filter_input_char('u');
+        app.insert_filter_input_char('d');
+        app.insert_filter_input_char('p');
+
+        let area = Rect::new(0, 0, 30, 3);
+        let (x, y) = filter_cursor_position(area, &app)
+            .expect("cursor should be available for a valid filter area");
+
+        assert!((1..=28).contains(&x));
+        assert_eq!(y, 1);
+    }
+
+    #[test]
+    fn filter_cursor_position_returns_none_when_area_too_small() {
+        let app = App::new();
+        assert!(filter_cursor_position(Rect::new(0, 0, 1, 1), &app).is_none());
+    }
 }
