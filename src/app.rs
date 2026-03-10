@@ -95,6 +95,10 @@ impl App {
         self.focus = FocusPane::FilterInput;
     }
 
+    pub fn focus_packet_list(&mut self) {
+        self.focus = FocusPane::PacketList;
+    }
+
     pub fn begin_filter_input_with_char(&mut self, ch: char) {
         self.focus_filter_input();
         self.insert_filter_input_char(ch);
@@ -360,6 +364,16 @@ mod tests {
 
         assert_eq!(app.focus(), FocusPane::FilterInput);
         assert_eq!(app.filter_input(), "u");
+    }
+
+    #[test]
+    fn focus_packet_list_sets_packet_focus() {
+        let mut app = App::new();
+        app.focus_filter_input();
+        assert_eq!(app.focus(), FocusPane::FilterInput);
+
+        app.focus_packet_list();
+        assert_eq!(app.focus(), FocusPane::PacketList);
     }
 
     #[test]

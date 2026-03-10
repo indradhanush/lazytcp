@@ -151,7 +151,7 @@ fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_footer(frame: &mut Frame, area: Rect) {
     let footer = Paragraph::new(
-        "q: quit | j/k or arrows: move selection in focused list | tab/shift+tab: cycle focus",
+        "q: quit | j/k or arrows: move selection in focused list | tab/shift+tab: cycle focus | enter on filter: focus packets",
     );
     frame.render_widget(footer, area);
 }

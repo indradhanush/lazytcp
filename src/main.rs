@@ -195,6 +195,7 @@ fn handle_event(app: &mut App) -> AppResult<()> {
                 KeyCode::Backspace if app.focus() == FocusPane::FilterInput => {
                     app.backspace_filter_input()
                 }
+                KeyCode::Enter if app.focus() == FocusPane::FilterInput => app.focus_packet_list(),
                 KeyCode::Enter if app.focus() == FocusPane::FilterSelector => {
                     app.focus_filter_input()
                 }
