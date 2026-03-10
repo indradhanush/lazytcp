@@ -1,0 +1,32 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Filter Parity Suite
+:END:
+#+TITLE: lazytcp Filter Parity Suite
+
+* Objective
+Add contract tests that lock filter correctness against =tcpdump= output for all filter categories, with explicit coverage for Date Time range, TCP Flags, Source Port, and Destination Port.
+
+* Scope
+In scope:
+- Add integration tests under =tests/= using deterministic pcap fixture generation.
+- Validate popup candidates per category against tcpdump-derived expectations.
+- Validate filter application results against tcpdump output baselines.
+- Include dedicated Date Time range parity assertions with inclusive bounds.
+
+Out of scope:
+- UI rendering changes.
+- Capture backend implementation changes.
+
+* Implementation Plan
+1. Add a fixture pcap builder that includes TCP, UDP, ICMP, ICMP6, IPv4, IPv6, broadcast, multicast, and varied TCP flag packets.
+2. Add candidate parity test for all non-DateTime categories.
+3. Add single-value filter parity test across all non-DateTime categories using tcpdump filter expressions where available and tcpdump-output-derived matching otherwise.
+4. Add Date Time range parity test against inclusive timestamp slicing from tcpdump output.
+5. Run =cargo fmt=, =cargo test=, and =cargo check=.
+
+* Verification Outcomes
+- 2026-03-10: Plan created.
+- 2026-03-10: Added =tests/contract_filter_parity.rs= with full-category filter parity assertions.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.
