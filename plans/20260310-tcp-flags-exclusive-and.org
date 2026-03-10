@@ -1,0 +1,37 @@
+:PROPERTIES:
+:CATEGORY: lazytcp TCP Flags Exclusive AND
+:END:
+#+TITLE: lazytcp TCP Flags Exclusive AND
+
+* Objective
+Change TCP flags filtering to exact flag-set matching so selected values represent the complete expected flag set.
+
+* Requested Behavior
+- Selecting =ACK= matches only packets with ACK set and no additional TCP flags.
+- Selecting =SYN= and =ACK= matches only packets with exactly SYN+ACK.
+- Existing behavior for non-TCP-flag dimensions remains unchanged.
+
+* Scope
+In scope:
+- Update TCP flag matching logic in =src/app.rs= to exact set equality.
+- Add/adjust unit tests for single and multi-flag exact matching.
+- Keep contract-test helper semantics aligned for TCP flags.
+
+Out of scope:
+- UI copy changes.
+- Capture backend changes.
+
+* Implementation Plan
+1. Add TCP-flag set comparison helper in =src/app.rs= and route TcpFlags filtering through it.
+2. Add app tests that prove ACK excludes ACK+PSH and SYN+ACK requires both flags exactly.
+3. Update =tests/contract_filter_parity.rs= helper semantics for TcpFlags to exact matching.
+4. Run =cargo fmt=, =cargo test=, and =cargo check=.
+
+* Verification Outcomes
+- 2026-03-10: Plan created.
+- 2026-03-10: Updated TcpFlags filtering in =src/app.rs= to use exact TCP flag-set matching.
+- 2026-03-10: Added app regression tests for exact ACK matching and exact SYN+ACK matching.
+- 2026-03-10: Updated TCP flag parity helper semantics in =tests/contract_filter_parity.rs= to exact set matching.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.

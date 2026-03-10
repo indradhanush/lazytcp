@@ -400,9 +400,9 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
             endpoint_port(&packet.destination).is_some_and(|port| port == query)
         }
         FilterDimension::Protocol => packet.protocol.to_ascii_lowercase() == query,
-        FilterDimension::TcpFlags => tcp_flags_from_summary(&packet.summary)
-            .iter()
-            .any(|flag| *flag == query.as_str()),
+        FilterDimension::TcpFlags => {
+            packet_matches_exact_tcp_flag_set(packet, std::iter::once(value))
+        }
         FilterDimension::IpVersion => {
             packet_ip_version(packet).is_some_and(|version| version == query)
         }
@@ -414,6 +414,31 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
             .as_deref()
             .is_some_and(|icmp_type| icmp_type == query),
     }
+}
+
+fn packet_matches_exact_tcp_flag_set<'a>(
+    packet: &PacketSummary,
+    selected_values: impl IntoIterator<Item = &'a str>,
+) -> bool {
+    let selected_flags: BTreeSet<String> = selected_values
+        .into_iter()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect();
+
+    if selected_flags.is_empty() {
+        return false;
+    }
+
+    let packet_flags: BTreeSet<&'static str> = tcp_flags_from_summary(&packet.summary)
+        .into_iter()
+        .collect();
+
+    packet_flags.len() == selected_flags.len()
+        && selected_flags
+            .iter()
+            .all(|selected_flag| packet_flags.contains(selected_flag.as_str()))
 }
 
 fn tcp_flags_from_summary(summary: &str) -> Vec<&'static str> {

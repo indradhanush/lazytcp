@@ -832,9 +832,38 @@ fn packet_matches_any_value(
     dimension: FilterDimension,
     values: &[String],
 ) -> bool {
+    if dimension == FilterDimension::TcpFlags {
+        return packet_matches_exact_tcp_flag_set(packet, values.iter().map(String::as_str));
+    }
+
     values
         .iter()
         .any(|value| packet_matches_value(packet, dimension, value))
+}
+
+fn packet_matches_exact_tcp_flag_set<'a>(
+    packet: &PacketSummary,
+    selected_values: impl IntoIterator<Item = &'a str>,
+) -> bool {
+    let selected_flags: BTreeSet<String> = selected_values
+        .into_iter()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect();
+
+    if selected_flags.is_empty() {
+        return false;
+    }
+
+    let packet_flags: BTreeSet<&'static str> = tcp_flags_from_summary(&packet.summary)
+        .into_iter()
+        .collect();
+
+    packet_flags.len() == selected_flags.len()
+        && selected_flags
+            .iter()
+            .all(|selected_flag| packet_flags.contains(selected_flag.as_str()))
 }
 
 fn packet_matches_all_active_filters(app: &App, packet: &PacketSummary) -> bool {
@@ -879,9 +908,9 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
             endpoint_port(&packet.destination).is_some_and(|port| port == query)
         }
         FilterDimension::Protocol => packet.protocol.to_ascii_lowercase() == query,
-        FilterDimension::TcpFlags => tcp_flags_from_summary(&packet.summary)
-            .iter()
-            .any(|flag| *flag == query.as_str()),
+        FilterDimension::TcpFlags => {
+            packet_matches_exact_tcp_flag_set(packet, std::iter::once(value))
+        }
         FilterDimension::IpVersion => {
             packet_ip_version(packet).is_some_and(|version| version == query)
         }
@@ -1177,6 +1206,43 @@ mod tests {
         ]
     }
 
+    fn sample_packets_with_tcp_flag_combinations() -> Vec<PacketSummary> {
+        vec![
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                source: "10.0.0.12.51544".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 0,
+                summary: "Flags [.], length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                source: "10.0.0.12.51545".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 0,
+                summary: "Flags [P.], length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                source: "10.0.0.12.51546".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 0,
+                summary: "Flags [S.], length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:04.004000".to_string(),
+                source: "10.0.0.12.51547".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 0,
+                summary: "Flags [S], length 0".to_string(),
+            },
+        ]
+    }
+
     fn select_filter_dimension(app: &mut App, target: FilterDimension) {
         for _ in 0..app.filter_dimensions().len() {
             if app.selected_filter_dimension() == target {
@@ -1191,6 +1257,22 @@ mod tests {
     fn type_into_date_time_popup(app: &mut App, value: &str) {
         for ch in value.chars() {
             app.filter_popup_insert_char(ch);
+        }
+    }
+
+    fn move_filter_popup_to_candidate(app: &mut App, candidate: &str) {
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("filter popup should expose candidates");
+        let target_index = candidates
+            .iter()
+            .position(|value| value == candidate)
+            .unwrap_or_else(|| panic!("candidate should be present in popup: {candidate}"));
+        let current_index = app.filter_popup_selected_index().unwrap_or(0);
+        let steps = (target_index + candidates.len() - current_index) % candidates.len();
+
+        for _ in 0..steps {
+            app.move_down();
         }
     }
 
@@ -1712,6 +1794,38 @@ mod tests {
         assert_eq!(app.filter_expression(), "tcp flags = SYN");
         assert_eq!(app.packets().len(), 1);
         assert!(app.packets()[0].summary.contains("Flags [S]"));
+    }
+
+    #[test]
+    fn tcp_flags_filter_matches_only_exact_ack_without_extra_flags() {
+        let mut app = App::with_packets(sample_packets_with_tcp_flag_combinations(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::TcpFlags);
+        app.open_filter_popup();
+        move_filter_popup_to_candidate(&mut app, "ACK");
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "tcp flags = ACK");
+        assert_eq!(app.packets().len(), 1);
+        assert!(app.packets()[0].summary.contains("Flags [.]"));
+    }
+
+    #[test]
+    fn tcp_flags_filter_matches_only_exact_syn_ack_set() {
+        let mut app = App::with_packets(sample_packets_with_tcp_flag_combinations(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::TcpFlags);
+        app.open_filter_popup();
+        move_filter_popup_to_candidate(&mut app, "ACK");
+        app.toggle_filter_popup_selection();
+        move_filter_popup_to_candidate(&mut app, "SYN");
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "tcp flags in [ACK, SYN]");
+        assert_eq!(app.packets().len(), 1);
+        assert!(app.packets()[0].summary.contains("Flags [S.]"));
     }
 
     #[test]
