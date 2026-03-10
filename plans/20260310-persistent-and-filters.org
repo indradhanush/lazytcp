@@ -1,0 +1,42 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Persistent AND Filter Plan
+:END:
+#+TITLE: lazytcp Persistent AND Filter Plan
+
+* Objective
+Preserve selected filters when changing filter dimension and apply active filters across dimensions with AND semantics.
+
+* Requested Behavior
+- Switching from one filter dimension to another must not clear existing filters.
+- Users should be able to build compound filters (for example: host + protocol) as an AND query.
+- Filter expression pane should show the combined active filter expression.
+
+* Current Baseline (2026-03-10)
+- Only one active filter dimension is stored at a time.
+- Changing filter dimension clears current filter selections.
+- Expression pane only represents one dimension.
+
+* Scope
+In scope:
+- Store active selections per dimension.
+- Preserve selections across dimension navigation.
+- Apply all active dimensions simultaneously as AND.
+- Render combined expression deterministically.
+
+Out of scope:
+- Boolean operators beyond implicit AND across dimensions.
+- Capture/backend changes.
+
+* Architecture Slice
+- =src/app.rs=
+  - Replace single active filter value store with per-dimension storage.
+  - Remove clearing behavior on dimension navigation.
+  - Rebuild filter expression from all active dimensions.
+  - Update popup preselection to use currently active values for selected dimension.
+  - Add tests for persistence and AND behavior.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for persistent AND filter behavior.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.

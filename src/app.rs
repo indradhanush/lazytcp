@@ -27,7 +27,7 @@ pub struct App {
     selected_packet: usize,
     filter_dimensions: Vec<FilterDimension>,
     selected_filter_dimension: usize,
-    active_filter_values: Vec<String>,
+    active_filter_values_by_dimension: Vec<Vec<String>>,
     filter_expression: String,
     capture_state: CaptureState,
     filter_popup: Option<FilterPopup>,
@@ -39,15 +39,16 @@ impl App {
     }
 
     pub fn with_packets(packets: Vec<PacketSummary>, _filter_input: String) -> Self {
+        let filter_dimensions = FilterDimension::ALL.to_vec();
         let mut app = Self {
             should_quit: false,
             focus: FocusPane::FilterSelector,
             all_packets: packets.clone(),
             packets,
             selected_packet: 0,
-            filter_dimensions: FilterDimension::ALL.to_vec(),
+            filter_dimensions: filter_dimensions.clone(),
             selected_filter_dimension: 0,
-            active_filter_values: Vec::new(),
+            active_filter_values_by_dimension: vec![Vec::new(); filter_dimensions.len()],
             filter_expression: String::new(),
             capture_state: CaptureState::Idle,
             filter_popup: None,
@@ -131,7 +132,11 @@ impl App {
         let dimension = self.selected_filter_dimension();
         let candidates = filter_candidates(&self.all_packets, dimension);
 
-        let selected_values: BTreeSet<String> = self.active_filter_values.iter().cloned().collect();
+        let selected_values: BTreeSet<String> = self
+            .active_filter_values_for_selected_dimension()
+            .iter()
+            .cloned()
+            .collect();
         let highlighted_index = candidates
             .iter()
             .position(|candidate| selected_values.contains(candidate))
@@ -154,14 +159,17 @@ impl App {
             return;
         };
 
-        self.active_filter_values = popup
+        let selected_values: Vec<String> = popup
             .candidates
             .iter()
             .filter(|candidate| popup.selected_values.contains(*candidate))
             .cloned()
             .collect();
-        self.filter_expression =
-            build_filter_expression(popup.dimension, &self.active_filter_values);
+        self.set_active_filter_values(popup.dimension, selected_values);
+        self.filter_expression = build_filter_expression(
+            &self.filter_dimensions,
+            &self.active_filter_values_by_dimension,
+        );
         self.apply_active_filter();
     }
 
@@ -226,10 +234,7 @@ impl App {
         }
 
         self.selected_filter_dimension = new_index;
-        self.active_filter_values.clear();
-        self.filter_expression.clear();
         self.filter_popup = None;
-        self.apply_active_filter();
     }
 
     pub fn move_down(&mut self) {
@@ -295,22 +300,42 @@ impl App {
     }
 
     fn apply_active_filter(&mut self) {
-        if self.active_filter_values.is_empty() {
+        if self
+            .active_filter_values_by_dimension
+            .iter()
+            .all(|values| values.is_empty())
+        {
             self.packets = self.all_packets.clone();
             self.clamp_selected_packet();
             return;
         }
 
-        let dimension = self.selected_filter_dimension();
         self.packets = self
             .all_packets
             .iter()
-            .filter(|packet| {
-                packet_matches_any_value(packet, dimension, &self.active_filter_values)
-            })
+            .filter(|packet| packet_matches_all_active_filters(self, packet))
             .cloned()
             .collect();
         self.clamp_selected_packet();
+    }
+
+    fn active_filter_values_for_selected_dimension(&self) -> &[String] {
+        self.active_filter_values_by_dimension
+            .get(self.selected_filter_dimension)
+            .map(|values| values.as_slice())
+            .unwrap_or(&[])
+    }
+
+    fn set_active_filter_values(&mut self, dimension: FilterDimension, values: Vec<String>) {
+        if let Some(index) = self
+            .filter_dimensions
+            .iter()
+            .position(|candidate| *candidate == dimension)
+        {
+            if let Some(slot) = self.active_filter_values_by_dimension.get_mut(index) {
+                *slot = values;
+            }
+        }
     }
 
     fn clamp_selected_packet(&mut self) {
@@ -323,16 +348,28 @@ impl App {
     }
 }
 
-fn build_filter_expression(dimension: FilterDimension, values: &[String]) -> String {
-    if values.is_empty() {
-        return String::new();
+fn build_filter_expression(
+    dimensions: &[FilterDimension],
+    values_by_dimension: &[Vec<String>],
+) -> String {
+    let mut clauses = Vec::new();
+
+    for (index, dimension) in dimensions.iter().enumerate() {
+        let Some(values) = values_by_dimension.get(index) else {
+            continue;
+        };
+        if values.is_empty() {
+            continue;
+        }
+
+        if values.len() == 1 {
+            clauses.push(format!("{} = {}", dimension.as_str(), values[0]));
+        } else {
+            clauses.push(format!("{} in [{}]", dimension.as_str(), values.join(", ")));
+        }
     }
 
-    if values.len() == 1 {
-        return format!("{} = {}", dimension.as_str(), values[0]);
-    }
-
-    format!("{} in [{}]", dimension.as_str(), values.join(", "))
+    clauses.join(" and ")
 }
 
 fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> Vec<String> {
@@ -375,6 +412,21 @@ fn packet_matches_any_value(
     values
         .iter()
         .any(|value| packet_matches_value(packet, dimension, value))
+}
+
+fn packet_matches_all_active_filters(app: &App, packet: &PacketSummary) -> bool {
+    app.filter_dimensions
+        .iter()
+        .enumerate()
+        .all(|(index, dimension)| {
+            let values = app
+                .active_filter_values_by_dimension
+                .get(index)
+                .map(|value| value.as_slice())
+                .unwrap_or(&[]);
+
+            values.is_empty() || packet_matches_any_value(packet, *dimension, values)
+        })
 }
 
 fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, value: &str) -> bool {
@@ -668,7 +720,7 @@ mod tests {
     }
 
     #[test]
-    fn changing_filter_dimension_clears_applied_values() {
+    fn changing_filter_dimension_preserves_applied_values() {
         let mut app = App::with_packets(sample_packets(), String::new());
 
         app.open_filter_popup();
@@ -680,7 +732,31 @@ mod tests {
         app.next_filter_dimension();
 
         assert_eq!(app.selected_filter_dimension(), FilterDimension::Source);
-        assert_eq!(app.filter_expression(), "");
-        assert_eq!(app.packets().len(), 3);
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1");
+        assert_eq!(app.packets().len(), 2);
+    }
+
+    #[test]
+    fn filters_across_dimensions_are_combined_with_and() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        app.open_filter_popup();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1");
+        assert_eq!(app.packets().len(), 2);
+
+        for _ in 0..4 {
+            app.next_filter_dimension();
+        }
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
+
+        app.open_filter_popup();
+        app.move_down();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1 and protocol = udp");
+        assert_eq!(app.packets().len(), 0);
     }
 }
