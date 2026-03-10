@@ -9,13 +9,12 @@ pub enum FilterDimension {
     Protocol,
     TcpFlags,
     IpVersion,
-    PacketLength,
     TrafficClass,
     IcmpType,
 }
 
 impl FilterDimension {
-    pub const ALL: [FilterDimension; 12] = [
+    pub const ALL: [FilterDimension; 11] = [
         FilterDimension::Host,
         FilterDimension::Source,
         FilterDimension::Destination,
@@ -25,7 +24,6 @@ impl FilterDimension {
         FilterDimension::Protocol,
         FilterDimension::TcpFlags,
         FilterDimension::IpVersion,
-        FilterDimension::PacketLength,
         FilterDimension::TrafficClass,
         FilterDimension::IcmpType,
     ];
@@ -41,7 +39,6 @@ impl FilterDimension {
             FilterDimension::Protocol => "protocol",
             FilterDimension::TcpFlags => "tcp flags",
             FilterDimension::IpVersion => "ip version",
-            FilterDimension::PacketLength => "length",
             FilterDimension::TrafficClass => "traffic class",
             FilterDimension::IcmpType => "icmp type",
         }
@@ -227,7 +224,6 @@ mod tests {
                 FilterDimension::Protocol,
                 FilterDimension::TcpFlags,
                 FilterDimension::IpVersion,
-                FilterDimension::PacketLength,
                 FilterDimension::TrafficClass,
                 FilterDimension::IcmpType,
             ]
@@ -245,7 +241,6 @@ mod tests {
         assert_eq!(FilterDimension::Protocol.as_str(), "protocol");
         assert_eq!(FilterDimension::TcpFlags.as_str(), "tcp flags");
         assert_eq!(FilterDimension::IpVersion.as_str(), "ip version");
-        assert_eq!(FilterDimension::PacketLength.as_str(), "length");
         assert_eq!(FilterDimension::TrafficClass.as_str(), "traffic class");
         assert_eq!(FilterDimension::IcmpType.as_str(), "icmp type");
     }

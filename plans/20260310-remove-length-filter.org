@@ -1,0 +1,22 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Remove Length Filter
+:END:
+#+TITLE: lazytcp Remove Length Filter
+
+* Objective
+Remove the =length= filter category from =Filter By= while keeping all other categories unchanged.
+
+* Scope
+In scope:
+- Remove =PacketLength= from =FilterDimension= and labels.
+- Remove length-specific candidate/matching logic.
+- Remove length-specific tests and helper fixtures.
+
+Out of scope:
+- Other filter category behavior changes.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for length-filter removal slice.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.
