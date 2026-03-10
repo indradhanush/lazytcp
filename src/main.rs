@@ -197,6 +197,7 @@ fn handle_event(app: &mut App) -> AppResult<()> {
                     KeyCode::Char('j') | KeyCode::Down => app.move_down(),
                     KeyCode::Char('k') | KeyCode::Up => app.move_up(),
                     KeyCode::Char(' ') => app.toggle_filter_popup_selection(),
+                    KeyCode::Char('c') => app.clear_filter_popup_selection(),
                     KeyCode::Enter => app.confirm_filter_popup(),
                     _ if is_popup_cancel_key(key.code, key.modifiers) => app.close_filter_popup(),
                     _ => {}

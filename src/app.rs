@@ -187,6 +187,14 @@ impl App {
         }
     }
 
+    pub fn clear_filter_popup_selection(&mut self) {
+        let Some(popup) = self.filter_popup.as_mut() else {
+            return;
+        };
+
+        popup.selected_values.clear();
+    }
+
     pub fn focus_filter_input(&mut self) {
         self.focus = FocusPane::FilterInput;
     }
@@ -713,6 +721,26 @@ mod tests {
 
         app.open_filter_popup();
         app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "");
+        assert_eq!(app.packets().len(), 3);
+    }
+
+    #[test]
+    fn popup_clear_selection_removes_all_checked_values_for_dimension() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        for _ in 0..4 {
+            app.next_filter_dimension();
+        }
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Protocol);
+
+        app.open_filter_popup();
+        app.toggle_filter_popup_selection();
+        app.move_down();
+        app.toggle_filter_popup_selection();
+        app.clear_filter_popup_selection();
         app.confirm_filter_popup();
 
         assert_eq!(app.filter_expression(), "");
