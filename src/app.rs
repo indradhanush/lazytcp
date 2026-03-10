@@ -489,6 +489,11 @@ fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> V
             FilterDimension::PacketLength => {
                 candidates.insert(packet.length.to_string());
             }
+            FilterDimension::TrafficClass => {
+                if let Some(class) = packet_traffic_class(packet) {
+                    candidates.insert(class.to_string());
+                }
+            }
         }
     }
 
@@ -550,6 +555,9 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
             .parse::<usize>()
             .ok()
             .is_some_and(|length| packet.length == length),
+        FilterDimension::TrafficClass => {
+            packet_traffic_class(packet).is_some_and(|class| class == query)
+        }
     }
 }
 
@@ -610,6 +618,46 @@ fn endpoint_ip_version(endpoint: &str) -> Option<&'static str> {
         return Some("ipv4");
     }
     None
+}
+
+fn packet_traffic_class(packet: &PacketSummary) -> Option<&'static str> {
+    endpoint_traffic_class(&packet.destination)
+}
+
+fn endpoint_traffic_class(endpoint: &str) -> Option<&'static str> {
+    let host = split_endpoint_host_port(endpoint)
+        .map(|(host, _)| host)
+        .unwrap_or(endpoint)
+        .to_ascii_lowercase();
+
+    if host.contains(':') {
+        return Some(if host.starts_with("ff") {
+            "multicast"
+        } else {
+            "unicast"
+        });
+    }
+
+    if !is_ipv4_address(&host) {
+        return None;
+    }
+
+    let octets: Vec<u8> = host
+        .split('.')
+        .filter_map(|part| part.parse::<u8>().ok())
+        .collect();
+    if octets.len() != 4 {
+        return None;
+    }
+
+    if host == "255.255.255.255" || octets[3] == 255 {
+        return Some("broadcast");
+    }
+    if (224..=239).contains(&octets[0]) {
+        return Some("multicast");
+    }
+
+    Some("unicast")
 }
 
 fn endpoint_port(endpoint: &str) -> Option<String> {
@@ -725,6 +773,35 @@ mod tests {
                 protocol: "TCP".to_string(),
                 length: 84,
                 summary: "Flags [.], length 84".to_string(),
+            },
+        ]
+    }
+
+    fn sample_packets_with_traffic_classes() -> Vec<PacketSummary> {
+        vec![
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                source: "10.0.0.12.51544".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 0,
+                summary: "Flags [S], length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                source: "192.168.1.10.5353".to_string(),
+                destination: "224.0.0.251.5353".to_string(),
+                protocol: "UDP".to_string(),
+                length: 32,
+                summary: "UDP, length 32".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                source: "0.0.0.0.68".to_string(),
+                destination: "255.255.255.255.67".to_string(),
+                protocol: "UDP".to_string(),
+                length: 300,
+                summary: "UDP, length 300".to_string(),
             },
         ]
     }
@@ -1078,6 +1155,44 @@ mod tests {
         assert_eq!(app.filter_expression(), "length = 12");
         assert_eq!(app.packets().len(), 1);
         assert_eq!(app.packets()[0].length, 12);
+    }
+
+    #[test]
+    fn traffic_class_popup_lists_unicast_multicast_and_broadcast() {
+        let mut app = App::with_packets(sample_packets_with_traffic_classes(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::TrafficClass);
+        assert_eq!(
+            app.selected_filter_dimension(),
+            FilterDimension::TrafficClass
+        );
+
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("traffic class popup should expose candidates");
+        assert_eq!(
+            candidates,
+            &[
+                "broadcast".to_string(),
+                "multicast".to_string(),
+                "unicast".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn traffic_class_filter_matches_broadcast_packets() {
+        let mut app = App::with_packets(sample_packets_with_traffic_classes(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::TrafficClass);
+        app.open_filter_popup();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "traffic class = broadcast");
+        assert_eq!(app.packets().len(), 1);
+        assert!(app.packets()[0].destination.starts_with("255.255.255.255"));
     }
 
     #[test]

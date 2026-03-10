@@ -10,10 +10,11 @@ pub enum FilterDimension {
     TcpFlags,
     IpVersion,
     PacketLength,
+    TrafficClass,
 }
 
 impl FilterDimension {
-    pub const ALL: [FilterDimension; 10] = [
+    pub const ALL: [FilterDimension; 11] = [
         FilterDimension::Host,
         FilterDimension::Source,
         FilterDimension::Destination,
@@ -24,6 +25,7 @@ impl FilterDimension {
         FilterDimension::TcpFlags,
         FilterDimension::IpVersion,
         FilterDimension::PacketLength,
+        FilterDimension::TrafficClass,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -38,6 +40,7 @@ impl FilterDimension {
             FilterDimension::TcpFlags => "tcp flags",
             FilterDimension::IpVersion => "ip version",
             FilterDimension::PacketLength => "length",
+            FilterDimension::TrafficClass => "traffic class",
         }
     }
 }
@@ -222,6 +225,7 @@ mod tests {
                 FilterDimension::TcpFlags,
                 FilterDimension::IpVersion,
                 FilterDimension::PacketLength,
+                FilterDimension::TrafficClass,
             ]
         );
     }
@@ -238,6 +242,7 @@ mod tests {
         assert_eq!(FilterDimension::TcpFlags.as_str(), "tcp flags");
         assert_eq!(FilterDimension::IpVersion.as_str(), "ip version");
         assert_eq!(FilterDimension::PacketLength.as_str(), "length");
+        assert_eq!(FilterDimension::TrafficClass.as_str(), "traffic class");
     }
 
     #[test]
