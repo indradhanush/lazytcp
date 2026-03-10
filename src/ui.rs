@@ -1,4 +1,4 @@
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{
@@ -388,7 +388,8 @@ fn render_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let popup_title = format!("Select {} values", dimension);
-    let popup_footer = Line::raw("space: toggle | enter: apply | esc: cancel");
+    let popup_footer =
+        Line::raw("space: toggle | enter: apply | esc: cancel").alignment(Alignment::Right);
     let list = List::new(items)
         .block(focused_block(&popup_title, true).title_bottom(popup_footer))
         .highlight_style(
