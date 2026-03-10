@@ -300,36 +300,63 @@ fn render_tcp_flags_sub_pane(frame: &mut Frame, area: Rect, details: &TcpPacketD
         return;
     }
 
+    let block = Block::default().borders(Borders::ALL).title("Flags");
+    let inner = block.inner(area);
+    if inner.width == 0 || inner.height == 0 {
+        return;
+    }
+
     let raw_flags = if details.flags.raw.is_empty() {
         "-"
     } else {
         &details.flags.raw
     };
 
-    let flags_line = Line::from(vec![
-        tcp_flag_span("N", details.flags.ns),
-        Span::raw(" "),
-        tcp_flag_span("C", details.flags.cwr),
-        Span::raw(" "),
-        tcp_flag_span("E", details.flags.ece),
-        Span::raw(" "),
-        tcp_flag_span("U", details.flags.urg),
-        Span::raw(" "),
-        tcp_flag_span("A", details.flags.ack),
-        Span::raw(" "),
-        tcp_flag_span("P", details.flags.psh),
-        Span::raw(" "),
-        tcp_flag_span("R", details.flags.rst),
-        Span::raw(" "),
-        tcp_flag_span("S", details.flags.syn),
-        Span::raw(" "),
-        tcp_flag_span("F", details.flags.fin),
-    ]);
+    let flags_line = tcp_flags_line(details, inner.width as usize);
 
     let pane = Paragraph::new(vec![flags_line, Line::raw(format!("raw: [{raw_flags}]"))])
-        .block(Block::default().borders(Borders::ALL).title("Flags"))
+        .block(block)
         .wrap(Wrap { trim: true });
     frame.render_widget(pane, area);
+}
+
+fn tcp_flags_line(details: &TcpPacketDetails, inner_width: usize) -> Line<'static> {
+    let tokens = [
+        ("N", details.flags.ns),
+        ("C", details.flags.cwr),
+        ("E", details.flags.ece),
+        ("U", details.flags.urg),
+        ("A", details.flags.ack),
+        ("P", details.flags.psh),
+        ("R", details.flags.rst),
+        ("S", details.flags.syn),
+        ("F", details.flags.fin),
+    ];
+
+    let min_gap_count = tokens.len().saturating_sub(1);
+    let token_width = tokens.len() * 2;
+    let min_row_width = token_width + min_gap_count;
+
+    let (base_gap_width, extra_gap_count) = if inner_width > min_row_width && min_gap_count > 0 {
+        let distributable = inner_width - min_row_width;
+        (
+            1 + (distributable / min_gap_count),
+            distributable % min_gap_count,
+        )
+    } else {
+        (1, 0)
+    };
+
+    let mut spans = Vec::with_capacity((tokens.len() * 2).saturating_sub(1));
+    for (index, (label, is_set)) in tokens.iter().enumerate() {
+        spans.push(tcp_flag_span(label, *is_set));
+        if index + 1 < tokens.len() {
+            let gap_width = base_gap_width + usize::from(index < extra_gap_count);
+            spans.push(Span::raw(" ".repeat(gap_width)));
+        }
+    }
+
+    Line::from(spans)
 }
 
 fn tcp_flag_span(label: &str, is_set: bool) -> Span<'static> {
@@ -476,7 +503,8 @@ fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
 
 #[cfg(test)]
 mod tests {
-    use super::{centered_rect, focused_block};
+    use super::{centered_rect, focused_block, tcp_flags_line};
+    use crate::domain::{TcpFlags, TcpPacketDetails};
     use ratatui::layout::Rect;
 
     #[test]
@@ -507,5 +535,43 @@ mod tests {
 
         assert_eq!(focused_inner.width, unfocused_inner.width);
         assert_eq!(focused_inner.height, unfocused_inner.height);
+    }
+
+    #[test]
+    fn tcp_flags_line_uses_available_inner_width() {
+        let details = TcpPacketDetails {
+            source_port: None,
+            destination_port: None,
+            sequence_number: None,
+            acknowledgement_number: None,
+            data_offset_words: None,
+            reserved_bits: None,
+            flags: TcpFlags {
+                ns: false,
+                cwr: false,
+                ece: false,
+                urg: false,
+                ack: true,
+                psh: false,
+                rst: false,
+                syn: true,
+                fin: false,
+                raw: "S.".to_string(),
+            },
+            window_size: None,
+            checksum: None,
+            urgent_pointer: None,
+            options: None,
+            payload_length: 0,
+        };
+
+        let line = tcp_flags_line(&details, 36);
+        let rendered: String = line
+            .spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect();
+
+        assert_eq!(rendered.len(), 36);
     }
 }
