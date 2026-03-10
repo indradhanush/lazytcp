@@ -125,6 +125,16 @@ cargo run
 - Keep capture-facing tests deterministic (mock process output unless explicitly testing integration behavior).
 - If UI behavior changes, keep baseline keyboard navigation (`q`, `j/down`, `k/up`) stable unless requirements change.
 
+## PCAP Portability Notes
+
+- `tcpdump -w` files from macOS and Linux are typically cross-platform pcap files by format.
+- Main compatibility differences come from captured link-layer headers (DLT), not the pcap container.
+- Linux `-i any` commonly produces cooked captures (`SLL`/`SLL2`); avoid this for golden parity fixtures.
+- macOS loopback captures can use `DLT_NULL`; avoid loopback for golden parity fixtures.
+- For reproducible parity tests, capture from a concrete non-loopback interface and use:
+  - `tcpdump -nn -s 0 -w <file>.pcap`
+- Expect possible timestamp precision/output differences across libpcap/tcpdump versions; normalize in assertions when needed.
+
 ## Change Strategy
 
 - Prefer evolving `domain.rs` and `capture.rs` contracts before UI refactors.
