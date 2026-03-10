@@ -1,0 +1,105 @@
+:PROPERTIES:
+:CATEGORY: lazytcp TCP Packet Detail Visualization Plan
+:END:
+#+TITLE: lazytcp TCP Packet Detail Visualization Plan
+
+* Objective
+Render TCP packets in the detail pane as a structure-oriented visualization that mirrors TCP header layout instead of only raw summary text.
+
+* Requested UX
+- When the selected packet protocol is TCP, show a TCP header diagram in the detail pane.
+- Diagram should map values to common TCP fields:
+  - source port / destination port
+  - sequence number / acknowledgment number
+  - data offset / reserved / flags / window
+  - checksum / urgent pointer
+  - options + payload length
+- Keep non-TCP packets on a readable fallback detail format.
+
+* Current Baseline (2026-03-10)
+- Packet detail pane currently renders simple key/value text + summary.
+- Packet model is =PacketSummary= only; TCP fields are embedded in the summary string.
+- TCP is inferred from tcpdump output, but no structured TCP header view exists.
+
+* Scope
+In scope:
+- Add a deterministic TCP detail extraction layer from existing packet fields.
+- Render a TCP-structure visualization in =src/ui.rs= when packet protocol is TCP.
+- Keep existing keyboard/navigation behavior unchanged.
+
+Out of scope:
+- Full byte-accurate packet decoding beyond currently parsed tcpdump data.
+- Protocol-specific visualizations for UDP/ICMP in this slice.
+- Capture backend/process behavior changes.
+
+* Architecture Slice
+- =src/domain.rs=
+  - Add typed TCP detail view model for UI rendering (field values may be optional where unavailable).
+  - Add parsing helpers from endpoint + summary string:
+    - source/destination port extraction from endpoint suffix
+    - TCP flags from =Flags [...]=
+    - sequence, acknowledgment, window, checksum, urgent pointer, payload length, options (best effort)
+  - Add focused unit tests for parsing boundaries and missing-field behavior.
+- =src/app.rs=
+  - Keep selection/focus behavior unchanged.
+  - Expose selected packet detail model for UI consumption (or helper method) without embedding rendering logic.
+- =src/ui.rs=
+  - Render an ASCII TCP header layout using the typed detail model.
+  - Show placeholders for unknown fields and preserve wrapping on narrow terminals.
+  - Keep non-TCP fallback detail rendering intact.
+- =src/main.rs=
+  - No event handling changes expected.
+- =src/capture.rs=
+  - No behavior change expected.
+
+* Milestones
+** M1: TCP Detail Model and Parsing
+Deliverables:
+- New TCP detail model with optional structured fields.
+- Parsing helpers and tests for representative tcpdump summary formats.
+
+Acceptance criteria:
+- Parsing never panics on malformed or partial summaries.
+- Known fields are extracted correctly for baseline TCP examples.
+
+** M2: TCP Diagram Rendering
+Deliverables:
+- Packet detail pane switches to TCP diagram for TCP packets.
+- Non-TCP detail view remains readable and unchanged in behavior.
+
+Acceptance criteria:
+- Diagram clearly reflects TCP header structure.
+- Unknown values are explicitly shown, not omitted silently.
+
+** M3: Regression and Verification
+Deliverables:
+- Tests updated/added for parsing and UI helper output where practical.
+- Full Rust verification run.
+
+Acceptance criteria:
+- Existing navigation/filter tests continue to pass.
+- =cargo fmt=, =cargo test=, and =cargo check= pass.
+
+* Execution Order
+1. Implement typed TCP detail parsing model in domain layer + tests.
+2. Wire app accessors to expose structured TCP detail for selected packet.
+3. Implement TCP header visualization in UI with non-TCP fallback preserved.
+4. Run verification commands and record outcomes.
+
+* Risks and Mitigations
+- Risk: tcpdump summary variations across versions can omit fields.
+  - Mitigation: treat all parsed fields as optional and keep resilient fallback labels.
+- Risk: Diagram readability in narrow terminals.
+  - Mitigation: use concise rows and wrap/block fallback when width is constrained.
+- Risk: Scope drift into full protocol dissector work.
+  - Mitigation: restrict parsing to fields already present in current summary text.
+
+* Definition of Done
+- TCP packets in detail pane display a structure-oriented TCP visualization.
+- Non-TCP packet detail behavior is preserved.
+- Parsing is covered by deterministic unit tests.
+- Required Rust verification commands pass.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for TCP packet detail visualization slice.
+- 2026-03-10: No Rust source changed in this step; cargo verification commands not required.
