@@ -499,7 +499,19 @@ fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> V
         }
     }
 
-    candidates.into_iter().collect()
+    let mut candidates: Vec<String> = candidates.into_iter().collect();
+    if matches!(
+        dimension,
+        FilterDimension::Port | FilterDimension::SourcePort | FilterDimension::DestinationPort
+    ) {
+        candidates.sort_by(|left, right| {
+            let left_port = left.parse::<u16>().ok();
+            let right_port = right.parse::<u16>().ok();
+            left_port.cmp(&right_port).then_with(|| left.cmp(right))
+        });
+    }
+
+    candidates
 }
 
 fn packet_matches_any_value(
@@ -1079,6 +1091,29 @@ mod tests {
     }
 
     #[test]
+    fn port_popup_lists_ports_in_numeric_order() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::Port);
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Port);
+
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("port popup should expose candidates");
+        assert_eq!(
+            candidates,
+            &[
+                "53".to_string(),
+                "443".to_string(),
+                "34211".to_string(),
+                "51544".to_string(),
+                "60000".to_string(),
+            ]
+        );
+    }
+
+    #[test]
     fn destination_port_popup_lists_only_destination_ports() {
         let mut app = App::with_packets(sample_packets(), String::new());
 
@@ -1092,7 +1127,7 @@ mod tests {
         let candidates = app
             .filter_popup_candidates()
             .expect("destination port popup should expose candidates");
-        assert_eq!(candidates, &["443".to_string(), "53".to_string()]);
+        assert_eq!(candidates, &["53".to_string(), "443".to_string()]);
     }
 
     #[test]
@@ -1116,6 +1151,7 @@ mod tests {
 
         select_filter_dimension(&mut app, FilterDimension::DestinationPort);
         app.open_filter_popup();
+        app.move_down();
         app.toggle_filter_popup_selection();
         app.confirm_filter_popup();
 
