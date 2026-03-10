@@ -362,11 +362,6 @@ fn render_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
     let popup_area = centered_rect(60, 70, area);
     frame.render_widget(Clear, popup_area);
 
-    let rows = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(4), Constraint::Length(3)])
-        .split(popup_area);
-
     let dimension = app
         .filter_popup_dimension()
         .map(|value| value.as_str())
@@ -393,8 +388,9 @@ fn render_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let popup_title = format!("Select {} values", dimension);
+    let popup_footer = Line::raw("space: toggle | enter: apply | esc: cancel");
     let list = List::new(items)
-        .block(focused_block(&popup_title, true))
+        .block(focused_block(&popup_title, true).title_bottom(popup_footer))
         .highlight_style(
             Style::default()
                 .fg(Color::Black)
@@ -408,14 +404,7 @@ fn render_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
         state.select(app.filter_popup_selected_index());
     }
 
-    frame.render_stateful_widget(list, rows[0], &mut state);
-
-    let hints = Paragraph::new("space: toggle | enter: apply | esc: cancel").block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title("Popup Controls"),
-    );
-    frame.render_widget(hints, rows[1]);
+    frame.render_stateful_widget(list, popup_area, &mut state);
 }
 
 fn focused_block(title: &str, is_focused: bool) -> Block<'_> {
