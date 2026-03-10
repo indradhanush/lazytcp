@@ -36,3 +36,31 @@ pub struct PacketSummary {
     pub length: usize,
     pub summary: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::FilterDimension;
+
+    #[test]
+    fn filter_dimension_all_contains_v1_dimensions_in_order() {
+        assert_eq!(
+            FilterDimension::ALL,
+            [
+                FilterDimension::Host,
+                FilterDimension::Source,
+                FilterDimension::Destination,
+                FilterDimension::Port,
+                FilterDimension::Protocol,
+            ]
+        );
+    }
+
+    #[test]
+    fn filter_dimension_as_str_maps_expected_keywords() {
+        assert_eq!(FilterDimension::Host.as_str(), "host");
+        assert_eq!(FilterDimension::Source.as_str(), "source");
+        assert_eq!(FilterDimension::Destination.as_str(), "destination");
+        assert_eq!(FilterDimension::Port.as_str(), "port");
+        assert_eq!(FilterDimension::Protocol.as_str(), "protocol");
+    }
+}

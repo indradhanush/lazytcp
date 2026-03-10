@@ -73,3 +73,48 @@ impl CaptureBackend for NoopCaptureBackend {
         self.state
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{CaptureBackend, CaptureState, NoopCaptureBackend};
+
+    #[test]
+    fn start_transitions_backend_to_running() {
+        let mut backend = NoopCaptureBackend::new();
+
+        backend.start().expect("start should succeed from idle");
+
+        assert_eq!(backend.state(), CaptureState::Running);
+    }
+
+    #[test]
+    fn start_returns_error_when_already_running() {
+        let mut backend = NoopCaptureBackend::new();
+        backend.start().expect("first start should succeed");
+
+        let error = backend.start().expect_err("second start should fail");
+
+        assert_eq!(error.to_string(), "capture is already running");
+        assert_eq!(backend.state(), CaptureState::Running);
+    }
+
+    #[test]
+    fn stop_transitions_backend_to_idle_after_start() {
+        let mut backend = NoopCaptureBackend::new();
+        backend.start().expect("start should succeed");
+
+        backend.stop().expect("stop should succeed from running");
+
+        assert_eq!(backend.state(), CaptureState::Idle);
+    }
+
+    #[test]
+    fn stop_returns_error_when_already_idle() {
+        let mut backend = NoopCaptureBackend::new();
+
+        let error = backend.stop().expect_err("stop should fail from idle");
+
+        assert_eq!(error.to_string(), "capture is already stopped");
+        assert_eq!(backend.state(), CaptureState::Idle);
+    }
+}

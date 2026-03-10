@@ -1,4 +1,4 @@
-.PHONY: all fmt test check
+.PHONY: all fmt test check coverage
 
 all: fmt test check
 
@@ -10,3 +10,6 @@ test:
 
 check:
 	cargo check
+
+coverage:
+	./scripts/coverage.sh

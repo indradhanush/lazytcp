@@ -1,0 +1,111 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Coverage Plan
+:END:
+#+TITLE: lazytcp Rust Coverage Measurement Plan
+
+* Objective
+Define a repeatable coverage workflow for =lazytcp= using upstream-recommended Rust tooling available from the Rust toolchain.
+
+* Upstream Guidance
+- Rust source-based coverage from rustc:
+  - compile tests with =-C instrument-coverage=
+  - merge raw profiles with =llvm-profdata=
+  - report/export with =llvm-cov=
+- Use LLVM tools from rustup component =llvm-tools= to avoid compiler/tool version skew.
+- Keep test execution on =cargo test=.
+
+* Current Baseline (2026-03-10)
+- Existing verification commands: =cargo fmt=, =cargo test=, =cargo check=.
+- =cargo llvm-cov= and =cargo tarpaulin= are not installed in this environment.
+- rustup component =llvm-tools= is available for the active toolchain but not yet installed.
+
+* Scope
+In scope:
+- Add a deterministic local coverage command path without introducing third-party coverage crates.
+- Produce three artifacts:
+  - terminal summary report
+  - =lcov.info= for CI ingestion
+  - HTML coverage report for local inspection
+- Use coverage output to prioritize missing tests in =src/domain.rs= and =src/capture.rs= first.
+
+Out of scope:
+- Enforcing a hard coverage threshold in CI for this slice.
+- TUI interaction coverage; focus remains on deterministic library/unit/contract tests.
+- Replacing existing baseline verification commands.
+
+* Milestones
+** M1: Toolchain-Consistent Coverage Setup
+Deliverables:
+- Install/ensure rustup component =llvm-tools= for the active toolchain.
+- Add helper command(s) to resolve =llvm-profdata= and =llvm-cov= paths from Rust sysroot.
+- Define profile output location under =target/coverage/=.
+
+Acceptance criteria:
+- =llvm-profdata --version= and =llvm-cov --version= resolve from Rust toolchain paths.
+- Coverage commands do not depend on Xcode LLVM binaries.
+
+** M2: Coverage Command Workflow
+Deliverables:
+- Add make target(s) for coverage execution/report generation (for example: =make coverage=).
+- Implement source-based coverage flow:
+  1. Run tests with =RUSTFLAGS="-C instrument-coverage"=
+  2. Emit raw profiles via =LLVM_PROFILE_FILE= pattern
+  3. Merge profiles to =target/coverage/lazytcp.profdata=
+  4. Generate terminal summary report and =lcov.info=
+  5. Generate HTML report directory
+
+Acceptance criteria:
+- One command regenerates all coverage artifacts from a clean coverage directory.
+- Summary report includes line and function percentages.
+
+** M3: Coverage-Guided Test Gap Triage
+Deliverables:
+- Capture initial baseline coverage snapshot.
+- Identify lowest-covered modules/functions.
+- Add focused tests in:
+  - =src/domain.rs= (filter parsing/normalization/match behavior)
+  - =src/capture.rs= (argument construction/parser boundaries/error paths)
+
+Acceptance criteria:
+- At least one targeted test addition per identified high-risk low-coverage area.
+- Coverage snapshot after test additions improves targeted files.
+
+** M4: Documentation and CI Follow-up
+Deliverables:
+- Document local coverage usage and artifact locations.
+- Record caveats (platform paths, external =tcpdump= dependency boundaries).
+- Add follow-up backlog item for optional CI publishing/gating after baseline stabilizes.
+
+Acceptance criteria:
+- Contributors can run coverage locally from docs without trial-and-error.
+- CI follow-up is scoped as a separate change.
+
+* Execution Order
+1. M1 toolchain setup.
+2. M2 coverage command automation.
+3. M3 coverage-driven tests.
+4. M4 docs and CI follow-up scoping.
+
+* Risks and Mitigations
+- Risk: LLVM version mismatch between compiler and report tools.
+  - Mitigation: use rustup =llvm-tools= binaries from active toolchain.
+- Risk: Stale profile artifacts produce noisy reports.
+  - Mitigation: clean =target/coverage/= before each coverage run.
+- Risk: Scope drifts into interactive TUI coverage.
+  - Mitigation: keep automation on library API/unit/contract test surfaces.
+
+* Definition of Done
+- =make coverage= (or equivalent) produces summary, LCOV, and HTML outputs locally.
+- Workflow uses Rust upstream source-based coverage tooling, not external wrappers.
+- Coverage results drive at least one concrete test-improvement slice.
+
+* Verification Outcomes
+- 2026-03-10: Plan created for Rust coverage workflow using upstream source-based tooling.
+- 2026-03-10: No Rust source/build/runtime behavior changed in this step; cargo verification commands not required.
+- 2026-03-10: Implemented =scripts/coverage.sh= and =make coverage= using rustup =llvm-tools= (=llvm-profdata=, =llvm-cov=) with source-based instrumentation.
+- 2026-03-10: Added coverage usage documentation at =docs/coverage.md=.
+- 2026-03-10: Added unit tests in =src/domain.rs= and =src/capture.rs= for previously uncovered paths.
+- 2026-03-10: =cargo fmt= passed.
+- 2026-03-10: =cargo test= passed.
+- 2026-03-10: =cargo check= passed.
+- 2026-03-10: =make coverage= passed; artifacts generated at =target/coverage/summary.txt=, =target/coverage/lcov.info=, and =target/coverage/html/index.html=.
