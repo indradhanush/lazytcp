@@ -322,19 +322,19 @@ fn render_tcp_flags_sub_pane(frame: &mut Frame, area: Rect, details: &TcpPacketD
 
 fn tcp_flags_line(details: &TcpPacketDetails, inner_width: usize) -> Line<'static> {
     let tokens = [
-        ("N", details.flags.ns),
-        ("C", details.flags.cwr),
-        ("E", details.flags.ece),
-        ("U", details.flags.urg),
-        ("A", details.flags.ack),
-        ("P", details.flags.psh),
-        ("R", details.flags.rst),
-        ("S", details.flags.syn),
-        ("F", details.flags.fin),
+        ("NS", details.flags.ns),
+        ("CWR", details.flags.cwr),
+        ("ECE", details.flags.ece),
+        ("URG", details.flags.urg),
+        ("ACK", details.flags.ack),
+        ("PSH", details.flags.psh),
+        ("RST", details.flags.rst),
+        ("SYN", details.flags.syn),
+        ("FIN", details.flags.fin),
     ];
 
     let min_gap_count = tokens.len().saturating_sub(1);
-    let token_width = tokens.len() * 2;
+    let token_width: usize = tokens.iter().map(|(label, _)| label.len().max(3)).sum();
     let min_row_width = token_width + min_gap_count;
 
     let (base_gap_width, extra_gap_count) = if inner_width > min_row_width && min_gap_count > 0 {
@@ -360,7 +360,6 @@ fn tcp_flags_line(details: &TcpPacketDetails, inner_width: usize) -> Line<'stati
 }
 
 fn tcp_flag_span(label: &str, is_set: bool) -> Span<'static> {
-    let value = if is_set { "1" } else { "0" };
     let style = if is_set {
         Style::default()
             .fg(Color::Green)
@@ -371,7 +370,7 @@ fn tcp_flag_span(label: &str, is_set: bool) -> Span<'static> {
             .add_modifier(Modifier::DIM)
     };
 
-    Span::styled(format!("{label}{value}"), style)
+    Span::styled(format!("{label:<3}"), style)
 }
 
 fn area_too_small_for_tcp_layout(area: Rect) -> bool {
