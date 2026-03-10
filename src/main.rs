@@ -189,13 +189,25 @@ fn handle_event(app: &mut App) -> AppResult<()> {
     if let Event::Key(key) = event::read()? {
         if key.kind == KeyEventKind::Press {
             match key.code {
-                KeyCode::Char('q') if app.focus() != FocusPane::FilterInput => app.quit(),
                 KeyCode::Char(ch) if app.focus() == FocusPane::FilterInput => {
                     app.insert_filter_input_char(ch)
                 }
                 KeyCode::Backspace if app.focus() == FocusPane::FilterInput => {
                     app.backspace_filter_input()
                 }
+                KeyCode::Enter if app.focus() == FocusPane::FilterSelector => {
+                    app.focus_filter_input()
+                }
+                KeyCode::Backspace if app.focus() == FocusPane::FilterSelector => {
+                    app.focus_filter_input();
+                    app.backspace_filter_input();
+                }
+                KeyCode::Char(ch)
+                    if app.focus() == FocusPane::FilterSelector && ch != 'j' && ch != 'k' =>
+                {
+                    app.begin_filter_input_with_char(ch);
+                }
+                KeyCode::Char('q') => app.quit(),
                 KeyCode::Char('j') | KeyCode::Down => app.move_down(),
                 KeyCode::Char('k') | KeyCode::Up => app.move_up(),
                 KeyCode::Tab => app.cycle_focus(),
