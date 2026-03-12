@@ -3,6 +3,7 @@ pub enum FilterDimension {
     Host,
     Source,
     Destination,
+    Interface,
     Port,
     SourcePort,
     DestinationPort,
@@ -15,10 +16,11 @@ pub enum FilterDimension {
 }
 
 impl FilterDimension {
-    pub const ALL: [FilterDimension; 12] = [
+    pub const ALL: [FilterDimension; 13] = [
         FilterDimension::Host,
         FilterDimension::Source,
         FilterDimension::Destination,
+        FilterDimension::Interface,
         FilterDimension::Port,
         FilterDimension::SourcePort,
         FilterDimension::DestinationPort,
@@ -35,6 +37,7 @@ impl FilterDimension {
             FilterDimension::Host => "host",
             FilterDimension::Source => "source",
             FilterDimension::Destination => "destination",
+            FilterDimension::Interface => "interface",
             FilterDimension::Port => "port",
             FilterDimension::SourcePort => "src port",
             FilterDimension::DestinationPort => "dst port",
@@ -52,6 +55,7 @@ impl FilterDimension {
             FilterDimension::Host => "Host",
             FilterDimension::Source => "Source",
             FilterDimension::Destination => "Destination",
+            FilterDimension::Interface => "Interface",
             FilterDimension::Port => "Port",
             FilterDimension::SourcePort => "Src Port",
             FilterDimension::DestinationPort => "Dst Port",
@@ -132,6 +136,7 @@ pub struct TcpPacketDetails {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PacketSummary {
     pub timestamp: String,
+    pub interface: Option<String>,
     pub source: String,
     pub destination: String,
     pub protocol: String,
@@ -222,6 +227,7 @@ mod tests {
     fn sample_tcp_packet(summary: &str) -> PacketSummary {
         PacketSummary {
             timestamp: "1970-01-01 00:00:01.001000".to_string(),
+            interface: None,
             source: "10.0.0.12.51544".to_string(),
             destination: "1.1.1.1.443".to_string(),
             protocol: "TCP".to_string(),
@@ -238,6 +244,7 @@ mod tests {
                 FilterDimension::Host,
                 FilterDimension::Source,
                 FilterDimension::Destination,
+                FilterDimension::Interface,
                 FilterDimension::Port,
                 FilterDimension::SourcePort,
                 FilterDimension::DestinationPort,
@@ -256,6 +263,7 @@ mod tests {
         assert_eq!(FilterDimension::Host.as_str(), "host");
         assert_eq!(FilterDimension::Source.as_str(), "source");
         assert_eq!(FilterDimension::Destination.as_str(), "destination");
+        assert_eq!(FilterDimension::Interface.as_str(), "interface");
         assert_eq!(FilterDimension::Port.as_str(), "port");
         assert_eq!(FilterDimension::SourcePort.as_str(), "src port");
         assert_eq!(FilterDimension::DestinationPort.as_str(), "dst port");
@@ -272,6 +280,7 @@ mod tests {
         assert_eq!(FilterDimension::Host.display_name(), "Host");
         assert_eq!(FilterDimension::Source.display_name(), "Source");
         assert_eq!(FilterDimension::Destination.display_name(), "Destination");
+        assert_eq!(FilterDimension::Interface.display_name(), "Interface");
         assert_eq!(FilterDimension::Port.display_name(), "Port");
         assert_eq!(FilterDimension::SourcePort.display_name(), "Src Port");
         assert_eq!(FilterDimension::DestinationPort.display_name(), "Dst Port");
@@ -330,6 +339,7 @@ mod tests {
     fn tcp_packet_details_returns_none_for_non_tcp_protocol() {
         let packet = PacketSummary {
             timestamp: "1970-01-01 00:00:02.002000".to_string(),
+            interface: None,
             source: "10.0.0.12.34211".to_string(),
             destination: "8.8.8.8.53".to_string(),
             protocol: "UDP".to_string(),

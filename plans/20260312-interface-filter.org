@@ -1,0 +1,41 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Interface Filter
+:END:
+#+TITLE: lazytcp Interface Filter
+
+* Objective
+Add =Interface= as a first-class =Filter By= option so operators can refine packet views by capture interface without restarting the TUI.
+
+* Requested Behavior
+- =Filter By= includes =Interface=.
+- Interface popup lists unique available interface names.
+- Selecting one or more interfaces filters packets using existing multi-select AND-across-dimensions semantics.
+
+* Scope
+In scope:
+- Add =Interface= filter dimension metadata.
+- Parse optional interface prefix from tcpdump output lines into packet summaries.
+- Add interface candidate extraction and packet matching behavior.
+- Extend tests and parity helpers for the new dimension.
+
+Out of scope:
+- Live capture backend interface selection.
+- Changes to external tcpdump invocation mode.
+
+* Architecture Slice
+- =src/domain.rs=
+  - Extend =FilterDimension= with =Interface=.
+  - Extend =PacketSummary= with optional interface metadata.
+- =src/api.rs=
+  - Parse timestamp/interface prefix from tcpdump lines.
+- =src/app.rs=
+  - Generate =Interface= candidates and matching behavior.
+  - Add focused app tests for interface filtering.
+- =tests/contract_filter_parity.rs=
+  - Include interface dimension handling in parity helper logic.
+
+* Verification Outcomes
+- 2026-03-12: Plan created for interface filter slice.
+- 2026-03-12: =cargo fmt= passed.
+- 2026-03-12: =cargo test= passed.
+- 2026-03-12: =cargo check= passed.

@@ -91,15 +91,17 @@ pub fn parse_tcpdump_line(line: &str) -> Option<PacketSummary> {
 }
 
 fn parse_ip_packet_line(line: &str) -> Option<PacketSummary> {
-    let (timestamp, payload) = line
+    let (prefix, payload) = line
         .split_once(" IP ")
         .or_else(|| line.split_once(" IP6 "))?;
+    let (timestamp, interface) = parse_capture_prefix(prefix);
 
     let (path_segment, summary) = payload.split_once(": ").unwrap_or((payload, ""));
     let (source, destination) = path_segment.split_once(" > ")?;
 
     Some(PacketSummary {
-        timestamp: timestamp.trim().to_string(),
+        timestamp,
+        interface,
         source: source.trim().to_string(),
         destination: destination.trim().trim_end_matches(':').to_string(),
         protocol: classify_protocol(source, destination, summary),
@@ -109,12 +111,14 @@ fn parse_ip_packet_line(line: &str) -> Option<PacketSummary> {
 }
 
 fn parse_arp_packet_line(line: &str) -> Option<PacketSummary> {
-    let (timestamp, summary) = line.split_once(" ARP, ")?;
+    let (prefix, summary) = line.split_once(" ARP, ")?;
+    let (timestamp, interface) = parse_capture_prefix(prefix);
     let summary = summary.trim();
     let (source, destination) = arp_endpoints_from_summary(summary);
 
     Some(PacketSummary {
-        timestamp: timestamp.trim().to_string(),
+        timestamp,
+        interface,
         source,
         destination,
         protocol: "ARP".to_string(),
@@ -142,6 +146,24 @@ fn arp_endpoints_from_summary(summary: &str) -> (String, String) {
     }
 
     ("unknown".to_string(), "unknown".to_string())
+}
+
+fn parse_capture_prefix(prefix: &str) -> (String, Option<String>) {
+    let mut parts = prefix.split_whitespace();
+    let Some(date) = parts.next() else {
+        return (prefix.trim().to_string(), None);
+    };
+    let Some(time) = parts.next() else {
+        return (prefix.trim().to_string(), None);
+    };
+
+    let timestamp = format!("{date} {time}");
+    let interface = parts
+        .next()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty() && value != "in" && value != "out");
+
+    (timestamp, interface)
 }
 
 fn classify_protocol(source: &str, destination: &str, summary: &str) -> String {
@@ -192,6 +214,7 @@ mod tests {
         let line = "1970-01-01 00:00:01.001000 IP 10.0.0.12.51544 > 1.1.1.1.443: Flags [S], seq 1, win 65535, length 0";
         let packet = parse_tcpdump_line(line).expect("line should parse");
 
+        assert_eq!(packet.interface, None);
         assert_eq!(packet.protocol, "TCP");
         assert_eq!(packet.source, "10.0.0.12.51544");
         assert_eq!(packet.destination, "1.1.1.1.443");
@@ -227,10 +250,21 @@ mod tests {
             "1970-01-01 00:00:04.004000 ARP, Reply 10.0.0.1 is-at aa:bb:cc:dd:ee:ff, length 28";
         let packet = parse_tcpdump_line(line).expect("line should parse");
 
+        assert_eq!(packet.interface, None);
         assert_eq!(packet.protocol, "ARP");
         assert_eq!(packet.source, "10.0.0.1");
         assert_eq!(packet.destination, "unknown");
         assert_eq!(packet.length, 28);
+    }
+
+    #[test]
+    fn parses_interface_prefix_and_normalizes_timestamp() {
+        let line = "1970-01-01 00:00:05.005000 en0 Out IP 10.0.0.12.51544 > 1.1.1.1.443: Flags [S], length 0";
+        let packet = parse_tcpdump_line(line).expect("line should parse");
+
+        assert_eq!(packet.timestamp, "1970-01-01 00:00:05.005000");
+        assert_eq!(packet.interface.as_deref(), Some("en0"));
+        assert_eq!(packet.source, "10.0.0.12.51544");
     }
 
     #[test]

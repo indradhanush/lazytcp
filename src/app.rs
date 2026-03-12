@@ -774,6 +774,11 @@ fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> V
             FilterDimension::Destination => {
                 candidates.insert(endpoint_host(&packet.destination));
             }
+            FilterDimension::Interface => {
+                if let Some(interface) = packet.interface.as_deref() {
+                    candidates.insert(interface.to_ascii_lowercase());
+                }
+            }
             FilterDimension::Port => {
                 if let Some(port) = endpoint_port(&packet.source) {
                     candidates.insert(port.to_string());
@@ -902,6 +907,10 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
         }
         FilterDimension::Source => endpoint_host(&packet.source) == query,
         FilterDimension::Destination => endpoint_host(&packet.destination) == query,
+        FilterDimension::Interface => packet
+            .interface
+            .as_deref()
+            .is_some_and(|interface| interface.eq_ignore_ascii_case(&query)),
         FilterDimension::Port => {
             endpoint_port(&packet.source).is_some_and(|port| port == query)
                 || endpoint_port(&packet.destination).is_some_and(|port| port == query)
@@ -1115,6 +1124,7 @@ mod tests {
         vec![
             PacketSummary {
                 timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                interface: None,
                 source: "10.0.0.12.51544".to_string(),
                 destination: "1.1.1.1.443".to_string(),
                 protocol: "TCP".to_string(),
@@ -1123,6 +1133,7 @@ mod tests {
             },
             PacketSummary {
                 timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                interface: None,
                 source: "10.0.0.12.34211".to_string(),
                 destination: "8.8.8.8.53".to_string(),
                 protocol: "UDP".to_string(),
@@ -1131,6 +1142,7 @@ mod tests {
             },
             PacketSummary {
                 timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                interface: None,
                 source: "192.168.1.5.60000".to_string(),
                 destination: "1.1.1.1.443".to_string(),
                 protocol: "TCP".to_string(),
@@ -1144,6 +1156,7 @@ mod tests {
         let mut packets = sample_packets();
         packets.push(PacketSummary {
             timestamp: "1970-01-01 00:00:04.004000".to_string(),
+            interface: None,
             source: "fe80::1.5353".to_string(),
             destination: "ff02::fb.5353".to_string(),
             protocol: "UDP".to_string(),
@@ -1157,6 +1170,7 @@ mod tests {
         vec![
             PacketSummary {
                 timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                interface: None,
                 source: "10.0.0.12.51544".to_string(),
                 destination: "1.1.1.1.443".to_string(),
                 protocol: "TCP".to_string(),
@@ -1165,6 +1179,7 @@ mod tests {
             },
             PacketSummary {
                 timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                interface: None,
                 source: "192.168.1.10.5353".to_string(),
                 destination: "224.0.0.251.5353".to_string(),
                 protocol: "UDP".to_string(),
@@ -1173,6 +1188,7 @@ mod tests {
             },
             PacketSummary {
                 timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                interface: None,
                 source: "0.0.0.0.68".to_string(),
                 destination: "255.255.255.255.67".to_string(),
                 protocol: "UDP".to_string(),
@@ -1186,6 +1202,7 @@ mod tests {
         vec![
             PacketSummary {
                 timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                interface: None,
                 source: "10.0.0.12".to_string(),
                 destination: "1.1.1.1".to_string(),
                 protocol: "ICMP".to_string(),
@@ -1194,6 +1211,7 @@ mod tests {
             },
             PacketSummary {
                 timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                interface: None,
                 source: "1.1.1.1".to_string(),
                 destination: "10.0.0.12".to_string(),
                 protocol: "ICMP".to_string(),
@@ -1202,6 +1220,7 @@ mod tests {
             },
             PacketSummary {
                 timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                interface: None,
                 source: "fe80::1".to_string(),
                 destination: "ff02::1:ff00:1".to_string(),
                 protocol: "ICMP6".to_string(),
@@ -1215,6 +1234,7 @@ mod tests {
         vec![
             PacketSummary {
                 timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                interface: None,
                 source: "10.0.0.12.51544".to_string(),
                 destination: "1.1.1.1.443".to_string(),
                 protocol: "TCP".to_string(),
@@ -1223,6 +1243,7 @@ mod tests {
             },
             PacketSummary {
                 timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                interface: None,
                 source: "10.0.0.12.51545".to_string(),
                 destination: "1.1.1.1.443".to_string(),
                 protocol: "TCP".to_string(),
@@ -1231,6 +1252,7 @@ mod tests {
             },
             PacketSummary {
                 timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                interface: None,
                 source: "10.0.0.12.51546".to_string(),
                 destination: "1.1.1.1.443".to_string(),
                 protocol: "TCP".to_string(),
@@ -1239,6 +1261,7 @@ mod tests {
             },
             PacketSummary {
                 timestamp: "1970-01-01 00:00:04.004000".to_string(),
+                interface: None,
                 source: "10.0.0.12.51547".to_string(),
                 destination: "1.1.1.1.443".to_string(),
                 protocol: "TCP".to_string(),
@@ -1252,6 +1275,7 @@ mod tests {
         let mut packets = sample_packets();
         packets.push(PacketSummary {
             timestamp: "1970-01-01 00:00:04.004000".to_string(),
+            interface: None,
             source: "10.0.0.2".to_string(),
             destination: "10.0.0.1".to_string(),
             protocol: "ARP".to_string(),
@@ -1259,6 +1283,38 @@ mod tests {
             summary: "Request who-has 10.0.0.1 tell 10.0.0.2, length 46".to_string(),
         });
         packets
+    }
+
+    fn sample_packets_with_interfaces() -> Vec<PacketSummary> {
+        vec![
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                interface: Some("en0".to_string()),
+                source: "10.0.0.12.51544".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 0,
+                summary: "Flags [S], length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                interface: Some("utun0".to_string()),
+                source: "10.0.0.12.34211".to_string(),
+                destination: "8.8.8.8.53".to_string(),
+                protocol: "UDP".to_string(),
+                length: 0,
+                summary: "UDP, length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                interface: Some("en0".to_string()),
+                source: "192.168.1.5.60000".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 0,
+                summary: "Flags [.], length 0".to_string(),
+            },
+        ]
     }
 
     fn select_filter_dimension(app: &mut App, target: FilterDimension) {
@@ -1559,6 +1615,38 @@ mod tests {
         assert_eq!(app.filter_expression(), "protocol = arp");
         assert_eq!(app.packets().len(), 1);
         assert_eq!(app.packets()[0].protocol, "ARP");
+    }
+
+    #[test]
+    fn interface_popup_lists_unique_interfaces() {
+        let mut app = App::with_packets(sample_packets_with_interfaces(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::Interface);
+        assert_eq!(app.selected_filter_dimension(), FilterDimension::Interface);
+
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("interface popup should expose candidates");
+
+        assert_eq!(candidates, &["en0".to_string(), "utun0".to_string()]);
+    }
+
+    #[test]
+    fn interface_filter_matches_selected_interface_only() {
+        let mut app = App::with_packets(sample_packets_with_interfaces(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::Interface);
+        app.open_filter_popup();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "interface = en0");
+        assert_eq!(app.packets().len(), 2);
+        assert!(app
+            .packets()
+            .iter()
+            .all(|packet| packet.interface.as_deref() == Some("en0")));
     }
 
     #[test]
@@ -2081,6 +2169,7 @@ mod tests {
     fn host_popup_includes_full_plain_ipv4_hosts() {
         let packets = vec![PacketSummary {
             timestamp: "1970-01-01 00:00:04.004000".to_string(),
+            interface: None,
             source: "192.168.0.242".to_string(),
             destination: "1.1.1.1".to_string(),
             protocol: "ICMP".to_string(),

@@ -267,6 +267,7 @@ fn tcpdump_filter_args_for_single_value(
             "host".to_string(),
             value.to_string(),
         ]),
+        FilterDimension::Interface => None,
         FilterDimension::Port => Some(vec!["port".to_string(), value.to_string()]),
         FilterDimension::SourcePort => Some(vec![
             "src".to_string(),
@@ -321,6 +322,11 @@ fn expected_candidates_for_dimension(
             }
             FilterDimension::Destination => {
                 candidates.insert(endpoint_host(&packet.destination));
+            }
+            FilterDimension::Interface => {
+                if let Some(interface) = packet.interface.as_deref() {
+                    candidates.insert(interface.to_ascii_lowercase());
+                }
             }
             FilterDimension::Port => {
                 if let Some(port) = endpoint_port(&packet.source) {
@@ -389,6 +395,10 @@ fn packet_matches_value(packet: &PacketSummary, dimension: FilterDimension, valu
         }
         FilterDimension::Source => endpoint_host(&packet.source) == query,
         FilterDimension::Destination => endpoint_host(&packet.destination) == query,
+        FilterDimension::Interface => packet
+            .interface
+            .as_deref()
+            .is_some_and(|interface| interface.eq_ignore_ascii_case(&query)),
         FilterDimension::Port => {
             endpoint_port(&packet.source).is_some_and(|port| port == query)
                 || endpoint_port(&packet.destination).is_some_and(|port| port == query)
@@ -608,12 +618,23 @@ fn is_ipv4_address(value: &str) -> bool {
     count == 4
 }
 
-fn packet_rows(packets: &[PacketSummary]) -> Vec<(String, String, String, String, usize, String)> {
+fn packet_rows(
+    packets: &[PacketSummary],
+) -> Vec<(
+    String,
+    Option<String>,
+    String,
+    String,
+    String,
+    usize,
+    String,
+)> {
     packets
         .iter()
         .map(|packet| {
             (
                 packet.timestamp.clone(),
+                packet.interface.clone(),
                 packet.source.clone(),
                 packet.destination.clone(),
                 packet.protocol.clone(),
