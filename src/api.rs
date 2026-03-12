@@ -158,12 +158,53 @@ fn parse_capture_prefix(prefix: &str) -> (String, Option<String>) {
     };
 
     let timestamp = format!("{date} {time}");
-    let interface = parts
-        .next()
-        .map(|value| value.trim().to_ascii_lowercase())
-        .filter(|value| !value.is_empty() && value != "in" && value != "out");
+    let remainder: Vec<&str> = parts.collect();
+    let interface = parse_interface_token(&remainder);
 
     (timestamp, interface)
+}
+
+fn parse_interface_token(tokens: &[&str]) -> Option<String> {
+    if tokens.is_empty() {
+        return None;
+    }
+
+    if let Some(direction_index) = tokens
+        .iter()
+        .position(|token| token.eq_ignore_ascii_case("in") || token.eq_ignore_ascii_case("out"))
+    {
+        if direction_index >= 2 && tokens[direction_index - 2].eq_ignore_ascii_case("ifindex") {
+            let ifindex = tokens[direction_index - 1].trim();
+            if ifindex.chars().all(|ch| ch.is_ascii_digit()) {
+                return Some(format!("ifindex-{ifindex}"));
+            }
+        }
+
+        if direction_index >= 1 {
+            let candidate = tokens[direction_index - 1];
+            if let Some(interface) = normalize_interface_token(candidate) {
+                return Some(interface);
+            }
+        }
+    }
+
+    normalize_interface_token(tokens[0])
+}
+
+fn normalize_interface_token(value: &str) -> Option<String> {
+    let candidate = value.trim().to_ascii_lowercase();
+    if candidate.is_empty()
+        || candidate == "ip"
+        || candidate == "ip6"
+        || candidate == "arp"
+        || candidate == "in"
+        || candidate == "out"
+        || candidate == "?"
+    {
+        return None;
+    }
+
+    Some(candidate)
 }
 
 fn classify_protocol(source: &str, destination: &str, summary: &str) -> String {
@@ -265,6 +306,25 @@ mod tests {
         assert_eq!(packet.timestamp, "1970-01-01 00:00:05.005000");
         assert_eq!(packet.interface.as_deref(), Some("en0"));
         assert_eq!(packet.source, "10.0.0.12.51544");
+    }
+
+    #[test]
+    fn parses_interface_from_ifindex_prefix() {
+        let line = "1970-01-01 00:00:06.006000 ifindex 2 In IP 10.0.0.12.51544 > 1.1.1.1.443: Flags [S], length 0";
+        let packet = parse_tcpdump_line(line).expect("line should parse");
+
+        assert_eq!(packet.timestamp, "1970-01-01 00:00:06.006000");
+        assert_eq!(packet.interface.as_deref(), Some("ifindex-2"));
+    }
+
+    #[test]
+    fn ignores_unknown_interface_placeholder() {
+        let line =
+            "1970-01-01 00:00:07.007000 ? In IP 10.0.0.12.51544 > 1.1.1.1.443: Flags [S], length 0";
+        let packet = parse_tcpdump_line(line).expect("line should parse");
+
+        assert_eq!(packet.timestamp, "1970-01-01 00:00:07.007000");
+        assert_eq!(packet.interface, None);
     }
 
     #[test]
