@@ -424,7 +424,7 @@ fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_footer(frame: &mut Frame, area: Rect) {
     let footer = Paragraph::new(
-        "q: quit | ?: keybindings | [0]Filter [1]Packets | filter pane: c clear selected category | enter: open popup | value popup: / search, space toggle, c clear category | date-time popup: type start/end, tab switch, c clear fields | C clear all | enter apply | esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
+        "q: quit | ?: keybindings | [0]Filter [1]Packets | filter pane: c clear selected category | enter: open popup | value popup: / search, space toggle, c clear category | date-time popup: type start/end, tab switch, c clear fields | C clear all | enter apply | esc cancel | j/k or arrows: move | tab/shift+tab: cycle filter/packets focus",
     );
     frame.render_widget(footer, area);
 }
@@ -620,7 +620,7 @@ fn render_keybindings_popup(frame: &mut Frame, app: &App, area: Rect) {
     let lines = vec![
         Line::raw("Global"),
         Line::raw("  q / Ctrl-C: quit"),
-        Line::raw("  tab / shift+tab: cycle focus"),
+        Line::raw("  tab / shift+tab: cycle [0]Filter and [1]Packets focus"),
         Line::raw("  0: focus [0]Filter pane"),
         Line::raw("  1: focus [1]Packets pane"),
         Line::raw("  j/k or arrows: move selection"),

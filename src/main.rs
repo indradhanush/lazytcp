@@ -458,6 +458,34 @@ mod tests {
     }
 
     #[test]
+    fn given_no_popup_when_press_tab_then_focus_cycles_between_filter_and_packets_only() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+
+        press_key(&mut app, KeyCode::Tab);
+        assert_eq!(app.focus(), FocusPane::PacketList);
+        assert_ne!(app.focus(), FocusPane::PacketDetail);
+
+        press_key(&mut app, KeyCode::Tab);
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+        assert_ne!(app.focus(), FocusPane::PacketDetail);
+    }
+
+    #[test]
+    fn given_no_popup_when_press_shift_tab_then_focus_cycles_between_filter_and_packets_only() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+
+        press_key(&mut app, KeyCode::BackTab);
+        assert_eq!(app.focus(), FocusPane::PacketList);
+        assert_ne!(app.focus(), FocusPane::PacketDetail);
+
+        press_key(&mut app, KeyCode::BackTab);
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+        assert_ne!(app.focus(), FocusPane::PacketDetail);
+    }
+
+    #[test]
     fn given_no_search_when_confirm_multiselect_popup_then_focus_stays_filter() {
         let mut app = App::with_packets(sample_packets(), String::new());
 

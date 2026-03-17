@@ -714,7 +714,7 @@ impl App {
 
         self.focus = match self.focus {
             FocusPane::FilterSelector => FocusPane::PacketList,
-            FocusPane::PacketList => FocusPane::PacketDetail,
+            FocusPane::PacketList => FocusPane::FilterSelector,
             FocusPane::PacketDetail => FocusPane::FilterSelector,
             FocusPane::FilterInput => FocusPane::PacketList,
         };
@@ -726,7 +726,7 @@ impl App {
         }
 
         self.focus = match self.focus {
-            FocusPane::FilterSelector => FocusPane::PacketDetail,
+            FocusPane::FilterSelector => FocusPane::PacketList,
             FocusPane::FilterInput => FocusPane::FilterSelector,
             FocusPane::PacketDetail => FocusPane::PacketList,
             FocusPane::PacketList => FocusPane::FilterSelector,
@@ -1640,18 +1640,17 @@ mod tests {
     }
 
     #[test]
-    fn cycle_focus_wraps_back_to_filter_selector() {
+    fn given_no_popup_when_tab_cycles_focus_then_packet_detail_is_skipped() {
         let mut app = App::new();
         assert_eq!(app.focus(), FocusPane::FilterSelector);
 
         app.cycle_focus();
         assert_eq!(app.focus(), FocusPane::PacketList);
-
-        app.cycle_focus();
-        assert_eq!(app.focus(), FocusPane::PacketDetail);
+        assert_ne!(app.focus(), FocusPane::PacketDetail);
 
         app.cycle_focus();
         assert_eq!(app.focus(), FocusPane::FilterSelector);
+        assert_ne!(app.focus(), FocusPane::PacketDetail);
     }
 
     #[test]
@@ -1743,18 +1742,17 @@ mod tests {
     }
 
     #[test]
-    fn reverse_cycle_focus_wraps_back_to_filter_selector() {
+    fn given_no_popup_when_shift_tab_cycles_focus_then_packet_detail_is_skipped() {
         let mut app = App::new();
         assert_eq!(app.focus(), FocusPane::FilterSelector);
 
         app.reverse_cycle_focus();
-        assert_eq!(app.focus(), FocusPane::PacketDetail);
-
-        app.reverse_cycle_focus();
         assert_eq!(app.focus(), FocusPane::PacketList);
+        assert_ne!(app.focus(), FocusPane::PacketDetail);
 
         app.reverse_cycle_focus();
         assert_eq!(app.focus(), FocusPane::FilterSelector);
+        assert_ne!(app.focus(), FocusPane::PacketDetail);
     }
 
     #[test]
