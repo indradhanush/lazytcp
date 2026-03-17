@@ -294,23 +294,29 @@ impl App {
             return;
         };
 
-        let selected_values = match popup.state {
+        let (selected_values, focus_after_confirm) = match popup.state {
             FilterPopupState::MultiSelect {
                 all_candidates,
                 selected_values,
                 ..
-            } => all_candidates
-                .iter()
-                .filter(|candidate| selected_values.contains(*candidate))
-                .cloned()
-                .collect(),
+            } => (
+                all_candidates
+                    .iter()
+                    .filter(|candidate| selected_values.contains(*candidate))
+                    .cloned()
+                    .collect(),
+                FocusPane::FilterSelector,
+            ),
             FilterPopupState::DateTimeRange {
                 start_input,
                 end_input,
                 ..
-            } => encode_date_time_range_filter_values(
-                normalize_date_time_popup_input(&start_input),
-                normalize_date_time_popup_input(&end_input),
+            } => (
+                encode_date_time_range_filter_values(
+                    normalize_date_time_popup_input(&start_input),
+                    normalize_date_time_popup_input(&end_input),
+                ),
+                FocusPane::PacketList,
             ),
         };
         self.set_active_filter_values(popup.dimension, selected_values);
@@ -319,7 +325,7 @@ impl App {
             &self.active_filter_values_by_dimension,
         );
         self.apply_active_filter();
-        self.focus = FocusPane::PacketList;
+        self.focus = focus_after_confirm;
     }
 
     pub fn toggle_filter_popup_selection(&mut self) {
@@ -1770,6 +1776,36 @@ mod tests {
     }
 
     #[test]
+    fn popup_confirm_with_search_query_keeps_focus_in_filter_selector() {
+        let mut app = App::with_packets(sample_packets_for_popup_search(), String::new());
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+
+        app.open_filter_popup();
+        type_into_filter_popup_search(&mut app, "10.10");
+        app.stop_filter_popup_search();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "host = 10.10.1.9");
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+    }
+
+    #[test]
+    fn popup_confirm_keeps_focus_in_filter_selector_after_search_mode_used_with_empty_query() {
+        let mut app = App::with_packets(sample_packets_for_popup_search(), String::new());
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+
+        app.open_filter_popup();
+        app.start_filter_popup_search();
+        app.stop_filter_popup_search();
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1");
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+    }
+
+    #[test]
     fn popup_selection_with_space_and_enter_applies_filter_expression() {
         let mut app = App::with_packets(sample_packets(), String::new());
 
@@ -1784,7 +1820,7 @@ mod tests {
 
         assert!(!app.is_filter_popup_open());
         assert_eq!(app.filter_expression(), "host = 8.8.8.8");
-        assert_eq!(app.focus(), FocusPane::PacketList);
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
         assert_eq!(app.packets().len(), 1);
         assert_eq!(app.packets()[0].destination, "8.8.8.8.53");
     }
