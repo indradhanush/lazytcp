@@ -31,7 +31,7 @@ cargo install --path .
 
 ### Filter pane
 
-- - `j` / `k` or arrow keys: move selection
+- `j` / `k` or arrow keys: move selection
 - `enter`: open value popup for the selected filter
 - `c`: clear selected filter dimension
 
