@@ -470,6 +470,12 @@ mod tests {
         }
     }
 
+    fn press_keys(app: &mut App, keys: &[KeyCode]) {
+        for key in keys {
+            press_key(app, *key);
+        }
+    }
+
     fn type_text(app: &mut App, value: &str) {
         for ch in value.chars() {
             press_key(app, KeyCode::Char(ch));
@@ -634,5 +640,79 @@ mod tests {
             resolve_key_action(&app, KeyCode::Char('1'), KeyModifiers::NONE),
             Some(KeyAction::FocusPacketList)
         );
+    }
+
+    #[test]
+    fn popup_confirm_focus_transition_matrix() {
+        struct FocusCase {
+            name: &'static str,
+            initial_dimension: FilterDimension,
+            keys: Vec<KeyCode>,
+            expected_focus: FocusPane,
+        }
+
+        let mut date_time_keys = vec![KeyCode::Enter];
+        date_time_keys.extend("1970-01-01 00:00:02.002000".chars().map(KeyCode::Char));
+        date_time_keys.push(KeyCode::Enter);
+
+        let cases = vec![
+            FocusCase {
+                name: "multiselect confirm without search",
+                initial_dimension: FilterDimension::Host,
+                keys: vec![KeyCode::Enter, KeyCode::Char(' '), KeyCode::Enter],
+                expected_focus: FocusPane::FilterSelector,
+            },
+            FocusCase {
+                name: "multiselect confirm without selection",
+                initial_dimension: FilterDimension::Host,
+                keys: vec![KeyCode::Enter, KeyCode::Enter],
+                expected_focus: FocusPane::FilterSelector,
+            },
+            FocusCase {
+                name: "multiselect confirm after search active",
+                initial_dimension: FilterDimension::Host,
+                keys: vec![
+                    KeyCode::Enter,
+                    KeyCode::Char('/'),
+                    KeyCode::Char('1'),
+                    KeyCode::Char('0'),
+                    KeyCode::Enter,
+                    KeyCode::Char(' '),
+                    KeyCode::Enter,
+                ],
+                expected_focus: FocusPane::FilterSelector,
+            },
+            FocusCase {
+                name: "multiselect confirm after search entered and cleared",
+                initial_dimension: FilterDimension::Host,
+                keys: vec![
+                    KeyCode::Enter,
+                    KeyCode::Char('/'),
+                    KeyCode::Char('1'),
+                    KeyCode::Char('0'),
+                    KeyCode::Backspace,
+                    KeyCode::Backspace,
+                    KeyCode::Enter,
+                    KeyCode::Char(' '),
+                    KeyCode::Enter,
+                ],
+                expected_focus: FocusPane::FilterSelector,
+            },
+            FocusCase {
+                name: "date time confirm",
+                initial_dimension: FilterDimension::DateTime,
+                keys: date_time_keys,
+                expected_focus: FocusPane::PacketList,
+            },
+        ];
+
+        for case in cases {
+            let mut app = App::with_packets(sample_packets(), String::new());
+            select_filter_dimension(&mut app, case.initial_dimension);
+            press_keys(&mut app, &case.keys);
+
+            assert_eq!(app.focus(), case.expected_focus, "case: {}", case.name);
+            assert!(!app.is_filter_popup_open(), "case: {}", case.name);
+        }
     }
 }
