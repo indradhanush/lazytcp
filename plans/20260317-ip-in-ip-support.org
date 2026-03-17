@@ -1,0 +1,114 @@
+:PROPERTIES:
+:CATEGORY: lazytcp IP-in-IP Support
+:END:
+#+TITLE: lazytcp IP-in-IP Packet Support Plan
+
+* Objective
+Add first-class support for IP-in-IP packets so operators can both identify tunneled traffic and keep current protocol filtering workflows intact.
+
+* Requested Behavior
+- IP-in-IP packets are detected during parsing and represented explicitly in app state.
+- Protocol filtering can isolate tunnel carriers (=ipip=) without breaking existing =tcp/udp/icmp/icmp6= behavior.
+- Packet detail pane clearly shows both outer IP header path and inner payload path.
+
+* Current Baseline (2026-03-17)
+- =PacketSummary= has one flat =protocol= string plus endpoint fields and raw summary text.
+- Protocol popup candidates come from =packet.protocol= only.
+- Protocol filter matching is exact string matching against =packet.protocol=.
+- Detail pane shows:
+  - TCP-specific visualization when protocol is TCP.
+  - Generic key/value fallback for all other protocols.
+
+* Filtering and Identification Paradigm
+Use a dual-view protocol model while keeping current =Protocol= dimension UX unchanged.
+
+1. Keep existing protocol semantics for operator continuity:
+   - =protocol=tcp/udp/icmp/icmp6= continues to match by effective payload protocol.
+   - For tunneled packets, effective protocol is the inner decoded protocol when available.
+2. Add explicit tunnel identity as an additional protocol candidate:
+   - Introduce normalized token =ipip= for packets with IP-in-IP encapsulation.
+   - =protocol=ipip= matches any packet carrying an IP packet inside an outer IP packet.
+3. Candidate behavior in popup:
+   - Keep current lowercase candidate style.
+   - For tunneled packets, contribute both:
+     - effective payload protocol candidate (for existing workflows), and
+     - =ipip= candidate (for tunnel-focused workflows).
+4. Keep AND semantics unchanged across dimensions.
+
+This preserves existing protocol workflows while adding a tunnel-aware discriminator in the same filter dimension.
+
+* Scope
+In scope:
+- Add tunnel metadata to packet model.
+- Parse IP-in-IP lines from tcpdump output (single-level nested IP for v1).
+- Extend protocol candidate/matching logic for =ipip= token.
+- Add an IP-in-IP-specific packet detail rendering path.
+- Add/adjust unit and contract tests for parser, filters, and detail helpers.
+
+Out of scope:
+- Multi-level recursive decapsulation beyond one inner IP header.
+- New filter dimensions (for example separate "Inner Protocol" dimension) in this slice.
+- Live capture backend/process model changes.
+
+* Architecture Slice
+- =src/domain.rs=
+  - Add typed encapsulation model (for example =IpInIpDetails=) with:
+    - outer source/destination,
+    - inner source/destination,
+    - inner protocol,
+    - inner summary snippet.
+  - Add helper(s) that safely derive IP-in-IP detail fields for detail-pane consumption.
+  - Keep fallback behavior non-panicking when nested summary format is partial.
+- =src/api.rs=
+  - Extend parsing/classification to detect nested ="IP ... > ...: ..."= or ="IP6 ... > ...: ..."= summary chains.
+  - Populate packet tunnel metadata and effective protocol deterministically.
+  - Normalize tunnel token used by app logic (=ipip=).
+- =src/app.rs=
+  - Update protocol candidate extraction to include =ipip= when packet has tunnel metadata.
+  - Update protocol matcher so:
+    - existing values still match effective protocol,
+    - =ipip= matches tunnel metadata presence.
+  - Keep expression rendering and AND semantics unchanged.
+- =src/ui.rs=
+  - Add dedicated IP-in-IP detail renderer selected before generic fallback.
+  - Proposed detail pane sections:
+    - Outer IP: source, destination, family.
+    - Tunnel: type (=IP-in-IP=), effective inner protocol.
+    - Inner IP: source, destination, inner summary excerpt.
+    - Raw summary line (for parity/debugging).
+  - Preserve existing TCP visualizer behavior for non-tunneled TCP packets.
+- =src/main.rs=
+  - No keybinding/focus changes expected.
+
+* Implementation Plan
+1. Extend packet/domain model to carry optional IP-in-IP metadata and add unit tests for extraction helpers.
+2. Update tcpdump line parser/classifier to detect and populate IP-in-IP metadata, including robust handling of partial nested summaries.
+3. Adjust protocol candidate and match logic in app filtering to add =ipip= without regressing existing protocol filters.
+4. Implement packet detail pane rendering for IP-in-IP packets with clear outer/inner separation and fallback safety.
+5. Update regression coverage:
+   - =src/api.rs= parser tests for IP-in-IP examples (IPv4-in-IPv4 and IPv6-in-IPv4 where available).
+   - =src/app.rs= tests for protocol popup candidates and =protocol=ipip= filtering semantics.
+   - =tests/contract_filter_parity.rs= expected protocol-candidate behavior and single-value matching path for =ipip=.
+6. Run required Rust verification commands:
+   - =cargo fmt=
+   - =cargo test=
+   - =cargo check=
+
+* Risks and Mitigations
+- Risk: tcpdump output variations may change nested summary formatting.
+  - Mitigation: use defensive parsing with optional fields and strict fallback to existing generic behavior.
+- Risk: protocol-filter regression for existing non-tunneled traffic.
+  - Mitigation: add explicit regression tests for =tcp/udp/icmp/icmp6= semantics alongside new =ipip= tests.
+- Risk: detail pane clutter on narrow terminals.
+  - Mitigation: use concise section labels, wrapping, and fallback to generic detail rendering when area is too small.
+
+* Definition of Done
+- Protocol popup surfaces =ipip= when fixture packets include tunneled IP traffic.
+- =protocol=ipip= filter returns tunneled packets only.
+- Existing protocol filtering behavior remains stable for non-tunneled traffic.
+- Packet detail pane displays explicit outer/inner IP structure for tunneled packets.
+- Rust verification commands pass.
+
+* Verification Outcomes
+- 2026-03-17: Plan created.
+- 2026-03-17: No Rust source changed in this step; cargo verification commands not required.
