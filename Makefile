@@ -1,15 +1,11 @@
-.PHONY: all fmt test check build coverage
+.PHONY: all check build coverage
 
-all: fmt test check build
-
-fmt:
-	cargo fmt
-
-test:
-	cargo test
+all: check build
 
 check:
+	cargo fmt
 	cargo check
+	cargo test
 
 build:
 	cargo build
