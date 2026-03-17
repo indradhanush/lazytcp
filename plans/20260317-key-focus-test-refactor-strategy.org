@@ -1,5 +1,5 @@
 :PROPERTIES:
-:CATEGORY: lazytcp Key Focus Test Refactor Strategy
+:CATEGORY: lazytcp Key/Focus Test Strategy and Refactor Plan
 :END:
 #+TITLE: lazytcp Key/Focus Test Strategy and Refactor Plan
 
@@ -48,8 +48,6 @@ Completed:
 - Step 1 completed in =src/main.rs= by extracting key routing into a testable =handle_key_press= path.
 - Step 2 completed in =src/main.rs= by introducing a shared =KeyAction= enum with =resolve_key_action= (mapping) and =apply_key_action= (execution), used by runtime handling and tests.
 - Step 3 completed with Given/When/Then scenario tests covering no-search confirm, search-active enter behavior, search-cleared confirm, and date-time confirm focus behavior.
-
-Remaining:
 - Step 4 completed in =src/main.rs= with =popup_confirm_focus_transition_matrix= table-driven coverage for confirm flows.
 - Step 5 completed by removing redundant single-case popup-confirm focus assertions in =src/main.rs= and relying on the matrix test as the primary confirm-focus contract.
 
