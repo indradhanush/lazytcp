@@ -1,0 +1,40 @@
+:PROPERTIES:
+:CATEGORY: lazytcp CI Coverage Badge Plan
+:END:
+#+TITLE: lazytcp Main-Branch Coverage Badge Update Plan
+
+* Objective
+Ensure =main= branch CI updates repository coverage badge data using this repo's =make coverage= flow, and expose a single machine-readable total coverage percentage.
+
+* Scope
+In scope:
+- Extend =scripts/coverage.sh= to output a single total coverage percentage for the whole repo.
+- Update =.github/workflows/ci.yml= to publish coverage badge data on =push= to =main=.
+- Keep current Rust checks behavior for PR and push.
+
+Out of scope:
+- Enforcing coverage thresholds.
+- Changing Rust test content.
+- TUI-driven integration test automation.
+
+* Implementation Steps
+1. Add a deterministic coverage total artifact (line coverage percentage) to =target/coverage/= from the coverage script.
+2. Add CI steps gated to =refs/heads/main= that:
+   - run =make coverage=,
+   - read the total percentage artifact,
+   - determine badge color,
+   - write badge state to gist via dynamic badge action.
+3. Keep workflow behavior unchanged for non-main refs except existing checks.
+
+* Verification
+- Validate script output artifact exists and contains numeric percentage after =make coverage=.
+- Validate workflow YAML shape and conditional logic by inspection.
+
+* Verification Outcomes
+- 2026-03-17: Plan created.
+- 2026-03-17: Added repo-wide line coverage artifact at =target/coverage/total.txt= via =scripts/coverage.sh=.
+- 2026-03-17: Created dedicated coverage workflow at =.github/workflows/coverage.yml= for =push= on =main= and manual dispatch.
+- 2026-03-17: Restored =.github/workflows/ci.yml= to Rust checks only.
+- 2026-03-17: Updated README coverage badge link to point to =coverage.yml=.
+- 2026-03-17: =make coverage= passed locally; =target/coverage/total.txt= produced (=76.87=).
+- 2026-03-17: Updated coverage total extraction to parse =llvm-cov export --summary-only= JSON instead of parsing =summary.txt=.

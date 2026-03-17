@@ -9,6 +9,8 @@ profdata_file="$coverage_dir/lazytcp.profdata"
 lcov_file="$coverage_dir/lcov.info"
 html_dir="$coverage_dir/html"
 summary_file="$coverage_dir/summary.txt"
+summary_json_file="$coverage_dir/summary.json"
+total_file="$coverage_dir/total.txt"
 artifacts_file="$coverage_dir/test-artifacts.jsonl"
 ignore_filename_regex='/.cargo/registry|/rustc/|/toolchains/.*/lib/rustlib/src/rust/library/'
 
@@ -27,6 +29,13 @@ EOF
   exit 1
 fi
 
+if ! command -v jq >/dev/null 2>&1; then
+  cat >&2 <<EOF
+error: jq is required for parsing coverage summary.
+EOF
+  exit 1
+fi
+
 rm -rf "$coverage_dir"
 mkdir -p "$raw_dir"
 
@@ -35,13 +44,13 @@ echo "running tests with source-based coverage instrumentation..."
   cd "$repo_root"
   RUSTFLAGS="-C instrument-coverage" \
   CARGO_INCREMENTAL=0 \
-  LLVM_PROFILE_FILE="$raw_dir/build-%p-%m.profraw" \
-  cargo test --tests --lib --bins --no-run --message-format=json >"$artifacts_file"
+    LLVM_PROFILE_FILE="$raw_dir/build-%p-%m.profraw" \
+    cargo test --tests --lib --bins --no-run --message-format=json >"$artifacts_file"
 
   RUSTFLAGS="-C instrument-coverage" \
-  CARGO_INCREMENTAL=0 \
-  LLVM_PROFILE_FILE="$raw_dir/run-%p-%m.profraw" \
-  cargo test
+    CARGO_INCREMENTAL=0 \
+    LLVM_PROFILE_FILE="$raw_dir/run-%p-%m.profraw" \
+    cargo test
 )
 
 shopt -s nullglob
@@ -107,12 +116,29 @@ echo "writing terminal summary to $summary_file..."
   --ignore-filename-regex="$ignore_filename_regex" \
   "${objects[@]}" | tee "$summary_file"
 
+echo "exporting summary json to $summary_json_file..."
+"$llvm_cov" export \
+  --summary-only \
+  --instr-profile="$profdata_file" \
+  --ignore-filename-regex="$ignore_filename_regex" \
+  "${objects[@]}" >"$summary_json_file"
+
+repo_line_coverage="$(
+  jq -r 'first(.data[]?.totals?.lines?.percent // empty)' "$summary_json_file"
+)"
+if [[ -z "$repo_line_coverage" || "$repo_line_coverage" == "null" ]]; then
+  echo "error: failed to derive total line coverage from $summary_json_file" >&2
+  exit 1
+fi
+repo_line_coverage="$(printf '%.2f' "$repo_line_coverage")"
+printf '%s\n' "$repo_line_coverage" >"$total_file"
+
 echo "exporting lcov report to $lcov_file..."
 "$llvm_cov" export \
   --format=lcov \
   --instr-profile="$profdata_file" \
   --ignore-filename-regex="$ignore_filename_regex" \
-  "${objects[@]}" > "$lcov_file"
+  "${objects[@]}" >"$lcov_file"
 
 echo "rendering html report to $html_dir..."
 mkdir -p "$html_dir"
@@ -125,5 +151,7 @@ mkdir -p "$html_dir"
 
 echo "coverage artifacts:"
 echo "  summary: $summary_file"
+echo "  summary json: $summary_json_file"
+echo "  total:   $total_file (${repo_line_coverage}%)"
 echo "  lcov:    $lcov_file"
 echo "  html:    $html_dir/index.html"

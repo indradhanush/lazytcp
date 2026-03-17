@@ -13,6 +13,12 @@ Install Rust LLVM tools once:
 rustup component add llvm-tools
 ```
 
+Ensure `jq` is available for parsing JSON summary output:
+
+```bash
+jq --version
+```
+
 ## Run coverage
 
 From the repository root:
@@ -24,6 +30,8 @@ make coverage
 This runs instrumented tests and writes reports under `target/coverage/`:
 
 - `summary.txt`: terminal summary from `llvm-cov report`
+- `summary.json`: machine-readable summary from `llvm-cov export --summary-only`
+- `total.txt`: single repo-wide line coverage percentage (without `%`)
 - `lcov.info`: LCOV export for CI/reporting systems
 - `html/index.html`: browseable HTML coverage report
 
