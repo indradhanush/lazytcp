@@ -43,6 +43,16 @@ Out of scope:
 5. Keep existing behavior tests that verify filter expression and packet narrowing, but route focus assertions through the matrix where possible.
 6. Run =cargo fmt=, =cargo test=, and =cargo check= after each slice.
 
+* Progress Update (2026-03-17)
+Completed:
+- Step 1 completed in =src/main.rs= by extracting key routing into a testable =handle_key_press= path.
+- Step 2 completed in =src/main.rs= by introducing a shared =KeyAction= enum with =resolve_key_action= (mapping) and =apply_key_action= (execution), used by runtime handling and tests.
+- Step 3 completed with Given/When/Then scenario tests covering no-search confirm, search-active enter behavior, search-cleared confirm, and date-time confirm focus behavior.
+
+Pending:
+- Step 4 pending: consolidate focus checks into a table-driven focus-matrix test.
+- Step 5 pending: route remaining focus assertions through the matrix helper to reduce duplication.
+
 * Risks and Mitigations
 - Risk: Refactor may inadvertently alter runtime key semantics.
   - Mitigation: keep runtime mapping thin and covered by compatibility tests.
@@ -56,3 +66,8 @@ Out of scope:
 
 * Verification Outcomes
 - 2026-03-17: Plan created.
+- 2026-03-17: Implemented testable key-press routing extraction and scenario tests (commit =a0526d9=).
+- 2026-03-17: Implemented shared key-action mapping/execution path in =src/main.rs= and added action-mapping tests for representative flows.
+- 2026-03-17: =cargo fmt= passed for the implemented slice.
+- 2026-03-17: =cargo test= passed for the implemented slice.
+- 2026-03-17: =cargo check= passed for the implemented slice.

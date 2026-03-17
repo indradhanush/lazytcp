@@ -267,84 +267,152 @@ fn handle_event(app: &mut App) -> AppResult<()> {
     Ok(())
 }
 
-fn handle_key_press(app: &mut App, key_code: KeyCode, modifiers: KeyModifiers) {
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum KeyAction {
+    Quit,
+    OpenKeybindingsPopup,
+    CloseKeybindingsPopup,
+    MoveDown,
+    MoveUp,
+    SwitchDateTimePopupField,
+    DateTimePopupBackspace,
+    ClearFilterPopupSelection,
+    ClearAllFilters,
+    ConfirmFilterPopup,
+    InsertDateTimePopupChar(char),
+    StartFilterPopupSearch,
+    FilterPopupSearchBackspace,
+    InsertFilterPopupSearchChar(char),
+    ToggleFilterPopupSelection,
+    StopFilterPopupSearch,
+    CloseFilterPopup,
+    FocusPacketList,
+    OpenFilterPopup,
+    ClearSelectedFilterDimension,
+    FocusFilterSelector,
+    CycleFocus,
+    ReverseCycleFocus,
+}
+
+fn resolve_key_action(app: &App, key_code: KeyCode, modifiers: KeyModifiers) -> Option<KeyAction> {
     if app.is_keybindings_popup_open() {
-        match key_code {
-            KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => app.quit(),
-            KeyCode::Char('q') => app.quit(),
-            KeyCode::Esc | KeyCode::Enter | KeyCode::Char('?') => app.close_keybindings_popup(),
-            _ => {}
-        }
-        return;
+        return match key_code {
+            KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
+                Some(KeyAction::Quit)
+            }
+            KeyCode::Char('q') => Some(KeyAction::Quit),
+            KeyCode::Esc | KeyCode::Enter | KeyCode::Char('?') => {
+                Some(KeyAction::CloseKeybindingsPopup)
+            }
+            _ => None,
+        };
     }
 
     if key_code == KeyCode::Char('?') {
-        app.open_keybindings_popup();
-        return;
+        return Some(KeyAction::OpenKeybindingsPopup);
     }
 
     if app.is_filter_popup_open() {
         if app.is_filter_popup_date_time() {
-            match key_code {
-                KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => app.quit(),
-                KeyCode::Char('q') => app.quit(),
-                KeyCode::Char('j') | KeyCode::Down => app.move_down(),
-                KeyCode::Char('k') | KeyCode::Up => app.move_up(),
-                KeyCode::Tab | KeyCode::BackTab => app.filter_popup_switch_date_time_field(),
-                KeyCode::Backspace => app.filter_popup_backspace(),
-                KeyCode::Char('c') => app.clear_filter_popup_selection(),
-                KeyCode::Char('C') => app.clear_all_filters(),
-                KeyCode::Enter => app.confirm_filter_popup(),
-                KeyCode::Char(ch) => app.filter_popup_insert_char(ch),
-                _ if is_popup_cancel_key(key_code, modifiers) => app.close_filter_popup(),
-                _ => {}
-            }
-        } else {
-            match key_code {
-                KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => app.quit(),
-                KeyCode::Char('q') => app.quit(),
-                KeyCode::Char('j') | KeyCode::Down => app.move_down(),
-                KeyCode::Char('k') | KeyCode::Up => app.move_up(),
-                KeyCode::Char('/') => app.start_filter_popup_search(),
-                KeyCode::Backspace if app.is_filter_popup_search_active() => {
-                    app.filter_popup_search_backspace()
+            return match key_code {
+                KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
+                    Some(KeyAction::Quit)
                 }
-                KeyCode::Char(ch) if app.is_filter_popup_search_active() => {
-                    app.filter_popup_search_insert_char(ch)
-                }
-                KeyCode::Char(' ') => app.toggle_filter_popup_selection(),
-                KeyCode::Char('c') => app.clear_filter_popup_selection(),
-                KeyCode::Char('C') if !app.is_filter_popup_search_active() => {
-                    app.clear_all_filters()
-                }
-                KeyCode::Enter if app.is_filter_popup_search_active() => {
-                    app.stop_filter_popup_search()
-                }
-                KeyCode::Enter => app.confirm_filter_popup(),
-                _ if is_popup_cancel_key(key_code, modifiers) => app.close_filter_popup(),
-                _ => {}
-            }
+                KeyCode::Char('q') => Some(KeyAction::Quit),
+                KeyCode::Char('j') | KeyCode::Down => Some(KeyAction::MoveDown),
+                KeyCode::Char('k') | KeyCode::Up => Some(KeyAction::MoveUp),
+                KeyCode::Tab | KeyCode::BackTab => Some(KeyAction::SwitchDateTimePopupField),
+                KeyCode::Backspace => Some(KeyAction::DateTimePopupBackspace),
+                KeyCode::Char('c') => Some(KeyAction::ClearFilterPopupSelection),
+                KeyCode::Char('C') => Some(KeyAction::ClearAllFilters),
+                KeyCode::Enter => Some(KeyAction::ConfirmFilterPopup),
+                KeyCode::Char(ch) => Some(KeyAction::InsertDateTimePopupChar(ch)),
+                _ if is_popup_cancel_key(key_code, modifiers) => Some(KeyAction::CloseFilterPopup),
+                _ => None,
+            };
         }
-        return;
+
+        return match key_code {
+            KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
+                Some(KeyAction::Quit)
+            }
+            KeyCode::Char('q') => Some(KeyAction::Quit),
+            KeyCode::Char('j') | KeyCode::Down => Some(KeyAction::MoveDown),
+            KeyCode::Char('k') | KeyCode::Up => Some(KeyAction::MoveUp),
+            KeyCode::Char('/') => Some(KeyAction::StartFilterPopupSearch),
+            KeyCode::Backspace if app.is_filter_popup_search_active() => {
+                Some(KeyAction::FilterPopupSearchBackspace)
+            }
+            KeyCode::Char(ch) if app.is_filter_popup_search_active() => {
+                Some(KeyAction::InsertFilterPopupSearchChar(ch))
+            }
+            KeyCode::Char(' ') => Some(KeyAction::ToggleFilterPopupSelection),
+            KeyCode::Char('c') => Some(KeyAction::ClearFilterPopupSelection),
+            KeyCode::Char('C') if !app.is_filter_popup_search_active() => {
+                Some(KeyAction::ClearAllFilters)
+            }
+            KeyCode::Enter if app.is_filter_popup_search_active() => {
+                Some(KeyAction::StopFilterPopupSearch)
+            }
+            KeyCode::Enter => Some(KeyAction::ConfirmFilterPopup),
+            _ if is_popup_cancel_key(key_code, modifiers) => Some(KeyAction::CloseFilterPopup),
+            _ => None,
+        };
     }
 
     match key_code {
-        KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => app.quit(),
-        KeyCode::Enter if app.focus() == FocusPane::FilterInput => app.focus_packet_list(),
-        KeyCode::Enter if app.focus() == FocusPane::FilterSelector => app.open_filter_popup(),
-        KeyCode::Char('c') if app.focus() == FocusPane::FilterSelector => {
-            app.clear_selected_filter_dimension()
+        KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => Some(KeyAction::Quit),
+        KeyCode::Enter if app.focus() == FocusPane::FilterInput => Some(KeyAction::FocusPacketList),
+        KeyCode::Enter if app.focus() == FocusPane::FilterSelector => {
+            Some(KeyAction::OpenFilterPopup)
         }
-        KeyCode::Char('q') => app.quit(),
-        KeyCode::Char('C') => app.clear_all_filters(),
-        KeyCode::Char('0') => app.focus_filter_selector(),
-        KeyCode::Char('1') => app.focus_packet_list(),
-        KeyCode::Char('/') => app.focus_filter_selector(),
-        KeyCode::Char('j') | KeyCode::Down => app.move_down(),
-        KeyCode::Char('k') | KeyCode::Up => app.move_up(),
-        KeyCode::Tab => app.cycle_focus(),
-        KeyCode::BackTab => app.reverse_cycle_focus(),
-        _ => {}
+        KeyCode::Char('c') if app.focus() == FocusPane::FilterSelector => {
+            Some(KeyAction::ClearSelectedFilterDimension)
+        }
+        KeyCode::Char('q') => Some(KeyAction::Quit),
+        KeyCode::Char('C') => Some(KeyAction::ClearAllFilters),
+        KeyCode::Char('0') => Some(KeyAction::FocusFilterSelector),
+        KeyCode::Char('1') => Some(KeyAction::FocusPacketList),
+        KeyCode::Char('/') => Some(KeyAction::FocusFilterSelector),
+        KeyCode::Char('j') | KeyCode::Down => Some(KeyAction::MoveDown),
+        KeyCode::Char('k') | KeyCode::Up => Some(KeyAction::MoveUp),
+        KeyCode::Tab => Some(KeyAction::CycleFocus),
+        KeyCode::BackTab => Some(KeyAction::ReverseCycleFocus),
+        _ => None,
+    }
+}
+
+fn apply_key_action(app: &mut App, action: KeyAction) {
+    match action {
+        KeyAction::Quit => app.quit(),
+        KeyAction::OpenKeybindingsPopup => app.open_keybindings_popup(),
+        KeyAction::CloseKeybindingsPopup => app.close_keybindings_popup(),
+        KeyAction::MoveDown => app.move_down(),
+        KeyAction::MoveUp => app.move_up(),
+        KeyAction::SwitchDateTimePopupField => app.filter_popup_switch_date_time_field(),
+        KeyAction::DateTimePopupBackspace => app.filter_popup_backspace(),
+        KeyAction::ClearFilterPopupSelection => app.clear_filter_popup_selection(),
+        KeyAction::ClearAllFilters => app.clear_all_filters(),
+        KeyAction::ConfirmFilterPopup => app.confirm_filter_popup(),
+        KeyAction::InsertDateTimePopupChar(ch) => app.filter_popup_insert_char(ch),
+        KeyAction::StartFilterPopupSearch => app.start_filter_popup_search(),
+        KeyAction::FilterPopupSearchBackspace => app.filter_popup_search_backspace(),
+        KeyAction::InsertFilterPopupSearchChar(ch) => app.filter_popup_search_insert_char(ch),
+        KeyAction::ToggleFilterPopupSelection => app.toggle_filter_popup_selection(),
+        KeyAction::StopFilterPopupSearch => app.stop_filter_popup_search(),
+        KeyAction::CloseFilterPopup => app.close_filter_popup(),
+        KeyAction::FocusPacketList => app.focus_packet_list(),
+        KeyAction::OpenFilterPopup => app.open_filter_popup(),
+        KeyAction::ClearSelectedFilterDimension => app.clear_selected_filter_dimension(),
+        KeyAction::FocusFilterSelector => app.focus_filter_selector(),
+        KeyAction::CycleFocus => app.cycle_focus(),
+        KeyAction::ReverseCycleFocus => app.reverse_cycle_focus(),
+    }
+}
+
+fn handle_key_press(app: &mut App, key_code: KeyCode, modifiers: KeyModifiers) {
+    if let Some(action) = resolve_key_action(app, key_code, modifiers) {
+        apply_key_action(app, action);
     }
 }
 
@@ -359,7 +427,10 @@ mod tests {
     use lazytcp::app::{App, FocusPane};
     use lazytcp::domain::{FilterDimension, PacketSummary};
 
-    use super::{handle_key_press, is_popup_cancel_key, parse_args_from, CliError, ParsedArgs};
+    use super::{
+        apply_key_action, is_popup_cancel_key, parse_args_from, resolve_key_action, CliError,
+        KeyAction, ParsedArgs,
+    };
 
     fn sample_packets() -> Vec<PacketSummary> {
         vec![
@@ -394,7 +465,9 @@ mod tests {
     }
 
     fn press_key(app: &mut App, key_code: KeyCode) {
-        handle_key_press(app, key_code, KeyModifiers::NONE);
+        if let Some(action) = resolve_key_action(app, key_code, KeyModifiers::NONE) {
+            apply_key_action(app, action);
+        }
     }
 
     fn type_text(app: &mut App, value: &str) {
@@ -535,5 +608,31 @@ mod tests {
         press_key(&mut app, KeyCode::Enter);
 
         assert_eq!(app.focus(), FocusPane::PacketList);
+    }
+
+    #[test]
+    fn resolve_key_action_maps_enter_in_active_search_mode_to_stop_search() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+        press_key(&mut app, KeyCode::Enter);
+        press_key(&mut app, KeyCode::Char('/'));
+        type_text(&mut app, "10");
+
+        let action = resolve_key_action(&app, KeyCode::Enter, KeyModifiers::NONE);
+
+        assert_eq!(action, Some(KeyAction::StopFilterPopupSearch));
+    }
+
+    #[test]
+    fn resolve_key_action_maps_keybindings_shortcuts_without_popup() {
+        let app = App::with_packets(sample_packets(), String::new());
+
+        assert_eq!(
+            resolve_key_action(&app, KeyCode::Char('0'), KeyModifiers::NONE),
+            Some(KeyAction::FocusFilterSelector)
+        );
+        assert_eq!(
+            resolve_key_action(&app, KeyCode::Char('1'), KeyModifiers::NONE),
+            Some(KeyAction::FocusPacketList)
+        );
     }
 }
