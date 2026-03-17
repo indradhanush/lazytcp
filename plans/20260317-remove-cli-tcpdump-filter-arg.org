@@ -1,0 +1,15 @@
+* Remove CLI tcpdump-filter arg
+
+** Goal
+Remove support for trailing tcpdump filter arguments from the `lazytcp` CLI so invocation contract is only:
+- `lazytcp <pcap-file>`
+
+** Scope
+- Update CLI parser and usage text in `src/main.rs`.
+- Reject extra positional args with a usage error.
+- Keep packet loading path deterministic by always using no external tcpdump filter args from CLI.
+
+** Verification Outcome
+- `cargo fmt` passed.
+- `cargo test` passed.
+- `cargo check` passed.

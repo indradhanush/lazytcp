@@ -22,7 +22,6 @@ type AppResult<T> = Result<T, Box<dyn std::error::Error>>;
 #[derive(Debug, Clone)]
 struct CliArgs {
     pcap_path: PathBuf,
-    filter_args: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -121,14 +120,21 @@ where
         )));
     }
 
+    if let Some(unexpected) = args.next() {
+        return Err(CliError::usage(format!(
+            "error: unexpected argument '{}'\n\n{}",
+            unexpected,
+            usage()
+        )));
+    }
+
     Ok(ParsedArgs::Run(CliArgs {
         pcap_path: PathBuf::from(first),
-        filter_args: args.collect(),
     }))
 }
 
 fn usage() -> String {
-    "usage: lazytcp <pcap-file> [tcpdump-filter...]\nexample: lazytcp capture.pcap udp".to_string()
+    "usage: lazytcp <pcap-file>\nexample: lazytcp capture.pcap".to_string()
 }
 
 fn load_packets(args: &CliArgs) -> Result<Vec<PacketSummary>, CliError> {
@@ -139,10 +145,9 @@ fn load_packets(args: &CliArgs) -> Result<Vec<PacketSummary>, CliError> {
         )));
     }
 
-    let filter_args: Vec<&str> = args.filter_args.iter().map(String::as_str).collect();
     let request = TcpdumpReadRequest {
         pcap_path: &args.pcap_path,
-        filter_args: &filter_args,
+        filter_args: &[],
     };
 
     TcpdumpApi::default()
@@ -372,7 +377,19 @@ mod tests {
         match result {
             Err(CliError::Usage(message)) => {
                 assert!(message.contains("missing required argument <pcap-file>"));
-                assert!(message.contains("usage: lazytcp <pcap-file> [tcpdump-filter...]"));
+                assert!(message.contains("usage: lazytcp <pcap-file>"));
+            }
+            other => panic!("expected usage error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn extra_positional_argument_returns_usage_error() {
+        let result = parse_args_from(vec!["capture.pcap".to_string(), "udp".to_string()]);
+        match result {
+            Err(CliError::Usage(message)) => {
+                assert!(message.contains("unexpected argument 'udp'"));
+                assert!(message.contains("usage: lazytcp <pcap-file>"));
             }
             other => panic!("expected usage error, got {other:?}"),
         }
