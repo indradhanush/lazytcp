@@ -1,6 +1,6 @@
 # lazytcp
 
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/indradhanush/97cfd90277d7142cfe8dc5f56e952172/raw/acd43aee058cbe411d970b0308c1173f2e85aa5f/lazytcp.json)](https://github.com/indradhanush/lazytcp/actions/workflows/coverage.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/indradhanush/97cfd90277d7142cfe8dc5f56e952172/raw/75079a418653e2e879f26b89bd543e97192bb744/lazytcp.json?v=1)](https://github.com/indradhanush/lazytcp/actions/workflows/coverage.yml)
 
 `lazytcp` is a TUI for interactively filtering packets from a `.pcap` file. It aims to provide a clean, fast and intuitive UX.
 Hat tip to the awesome [lazygit](https://github.com/jesseduffield/lazygit) TUI for the name inspiration. 🙌
