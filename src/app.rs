@@ -259,7 +259,16 @@ impl App {
                 }
             }
             _ => {
-                let all_candidates = filter_candidates(&self.all_packets, dimension);
+                let all_candidates = filter_candidates(
+                    self.all_packets.iter().filter(|packet| {
+                        packet_matches_all_active_filters_except_dimension(
+                            self,
+                            packet,
+                            Some(dimension),
+                        )
+                    }),
+                    dimension,
+                );
                 let selected_values: BTreeSet<String> = self
                     .active_filter_values_for_selected_dimension()
                     .iter()
@@ -930,7 +939,10 @@ fn refresh_popup_search_candidates(
     *highlighted_index = 0;
 }
 
-fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> Vec<String> {
+fn filter_candidates<'a>(
+    packets: impl IntoIterator<Item = &'a PacketSummary>,
+    dimension: FilterDimension,
+) -> Vec<String> {
     if dimension == FilterDimension::TcpFlags {
         return all_tcp_flag_labels()
             .iter()
@@ -1055,10 +1067,22 @@ fn packet_matches_exact_tcp_flag_set<'a>(
 }
 
 fn packet_matches_all_active_filters(app: &App, packet: &PacketSummary) -> bool {
+    packet_matches_all_active_filters_except_dimension(app, packet, None)
+}
+
+fn packet_matches_all_active_filters_except_dimension(
+    app: &App,
+    packet: &PacketSummary,
+    excluded_dimension: Option<FilterDimension>,
+) -> bool {
     app.filter_dimensions
         .iter()
         .enumerate()
         .all(|(index, dimension)| {
+            if excluded_dimension.is_some_and(|excluded| *dimension == excluded) {
+                return true;
+            }
+
             let values = app
                 .active_filter_values_by_dimension
                 .get(index)
@@ -1527,12 +1551,60 @@ mod tests {
         ]
     }
 
+    fn sample_packets_for_iterative_candidates() -> Vec<PacketSummary> {
+        vec![
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                interface: None,
+                source: "10.0.0.1.5000".to_string(),
+                destination: "1.1.1.1.80".to_string(),
+                protocol: "ICMP".to_string(),
+                length: 84,
+                summary: "ICMP echo request, id 1, seq 1, length 64".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                interface: None,
+                source: "10.0.0.2.5001".to_string(),
+                destination: "8.8.8.8.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 60,
+                summary: "Flags [S], length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                interface: None,
+                source: "10.0.0.3.5002".to_string(),
+                destination: "1.1.1.1.80".to_string(),
+                protocol: "ICMP".to_string(),
+                length: 84,
+                summary: "ICMP echo reply, id 1, seq 1, length 64".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:04.004000".to_string(),
+                interface: None,
+                source: "10.0.0.4.5003".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 60,
+                summary: "Flags [.], length 0".to_string(),
+            },
+        ]
+    }
+
     fn select_filter_dimension(app: &mut App, target: FilterDimension) {
         for _ in 0..app.filter_dimensions().len() {
             if app.selected_filter_dimension() == target {
                 return;
             }
             app.next_filter_dimension();
+        }
+
+        for _ in 0..app.filter_dimensions().len() {
+            if app.selected_filter_dimension() == target {
+                return;
+            }
+            app.previous_filter_dimension();
         }
 
         panic!("failed to select filter dimension: {target:?}");
@@ -1930,6 +2002,61 @@ mod tests {
         assert_eq!(app.filter_expression(), "protocol = arp");
         assert_eq!(app.packets().len(), 1);
         assert_eq!(app.packets()[0].protocol, "ARP");
+    }
+
+    #[test]
+    fn host_popup_candidates_are_narrowed_by_active_protocol_filter() {
+        let mut app = App::with_packets(sample_packets_for_iterative_candidates(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::Protocol);
+        app.open_filter_popup();
+        move_filter_popup_to_candidate(&mut app, "icmp");
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+        assert_eq!(app.filter_expression(), "protocol = icmp");
+
+        select_filter_dimension(&mut app, FilterDimension::Host);
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("host popup should expose candidates");
+
+        assert_eq!(
+            candidates,
+            &[
+                "1.1.1.1".to_string(),
+                "10.0.0.1".to_string(),
+                "10.0.0.3".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn protocol_popup_candidates_respect_other_filters_while_editing_protocol_dimension() {
+        let mut app = App::with_packets(sample_packets_for_iterative_candidates(), String::new());
+
+        select_filter_dimension(&mut app, FilterDimension::Host);
+        app.open_filter_popup();
+        move_filter_popup_to_candidate(&mut app, "1.1.1.1");
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1");
+
+        select_filter_dimension(&mut app, FilterDimension::Protocol);
+        app.open_filter_popup();
+        move_filter_popup_to_candidate(&mut app, "icmp");
+        app.toggle_filter_popup_selection();
+        app.confirm_filter_popup();
+        assert_eq!(
+            app.filter_expression(),
+            "host = 1.1.1.1 and protocol = icmp"
+        );
+
+        app.open_filter_popup();
+        let candidates = app
+            .filter_popup_candidates()
+            .expect("protocol popup should expose candidates");
+        assert_eq!(candidates, &["icmp".to_string(), "tcp".to_string()]);
     }
 
     #[test]
@@ -2385,8 +2512,8 @@ mod tests {
         app.toggle_filter_popup_selection();
         app.confirm_filter_popup();
 
-        assert_eq!(app.filter_expression(), "host = 1.1.1.1 and protocol = udp");
-        assert_eq!(app.packets().len(), 0);
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1 and protocol = tcp");
+        assert_eq!(app.packets().len(), 2);
     }
 
     #[test]
@@ -2403,8 +2530,8 @@ mod tests {
         app.move_down();
         app.toggle_filter_popup_selection();
         app.confirm_filter_popup();
-        assert_eq!(app.filter_expression(), "host = 1.1.1.1 and protocol = udp");
-        assert_eq!(app.packets().len(), 0);
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1 and protocol = tcp");
+        assert_eq!(app.packets().len(), 2);
 
         app.clear_all_filters();
 
@@ -2428,8 +2555,8 @@ mod tests {
         app.move_down();
         app.toggle_filter_popup_selection();
         app.confirm_filter_popup();
-        assert_eq!(app.filter_expression(), "host = 1.1.1.1 and protocol = udp");
-        assert_eq!(app.packets().len(), 0);
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1 and protocol = tcp");
+        assert_eq!(app.packets().len(), 2);
 
         app.clear_selected_filter_dimension();
 

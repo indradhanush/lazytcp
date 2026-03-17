@@ -1,0 +1,43 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Iterative Filter Candidates
+:END:
+#+TITLE: lazytcp Iterative Filter Candidate Narrowing
+
+* Objective
+Make filter value popups reflect already-applied filters from other dimensions so users only see relevant candidate values.
+
+* Requested Behavior
+- If =protocol= is filtered to =icmp=, opening =host= popup should list only hosts present in ICMP packets.
+- Candidate lists should exclude values with zero matching packets under current active filters.
+
+* Scope
+In scope:
+- Popup candidate derivation updates in =src/app.rs=.
+- App tests for iterative candidate narrowing behavior.
+
+Out of scope:
+- UI rendering redesign.
+- Capture/backend changes.
+
+* Implementation Plan
+1. Add helper matching logic that evaluates packets against active filters while excluding the popup's current dimension.
+2. Build popup candidates from packets that pass that constrained match.
+3. Add tests verifying protocol-filtered host candidate narrowing.
+4. Run =cargo fmt=, =cargo test=, and =cargo check=.
+
+* Risks and Mitigations
+- Risk: Editing a currently active dimension could hide alternative values.
+  - Mitigation: Exclude the popup's own dimension from pre-filter matching when building its candidate list.
+
+* Definition of Done
+- Host (and other dimensions) popup candidates narrow according to active filters from other dimensions.
+- Rust verification commands pass.
+
+* Verification Outcomes
+- 2026-03-17: Plan created.
+- 2026-03-17: Implemented candidate derivation using packets that satisfy active filters from other dimensions (excluding the currently edited dimension) in =src/app.rs=.
+- 2026-03-17: Added app tests for protocol-filtered host candidate narrowing and protocol-popup candidate behavior under other active filters.
+- 2026-03-17: Updated existing app tests to match faceted candidate behavior.
+- 2026-03-17: =cargo fmt= passed.
+- 2026-03-17: =cargo test= passed.
+- 2026-03-17: =cargo check= passed.
