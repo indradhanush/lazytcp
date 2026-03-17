@@ -222,7 +222,7 @@ fn extract_numeric_field_u32(summary: &str, key: &str) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-    use super::{tcp_packet_details, FilterDimension, PacketSummary, TcpFlags};
+    use super::{FilterDimension, PacketSummary, TcpFlags, tcp_packet_details};
 
     fn sample_tcp_packet(summary: &str) -> PacketSummary {
         PacketSummary {

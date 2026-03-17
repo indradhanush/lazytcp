@@ -3,19 +3,19 @@ use std::path::PathBuf;
 use std::process;
 use std::time::{Duration, Instant};
 
+use crossterm::ExecutableCommand;
 use crossterm::cursor::DisableBlinking;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use crossterm::style::Print;
 use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
-use crossterm::ExecutableCommand;
 use lazytcp::api::{TcpdumpApi, TcpdumpReadRequest};
 use lazytcp::app::{App, FocusPane};
 use lazytcp::domain::PacketSummary;
 use lazytcp::ui;
-use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
+use ratatui::backend::CrosstermBackend;
 
 type AppResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -428,8 +428,8 @@ mod tests {
     use lazytcp::domain::{FilterDimension, PacketSummary};
 
     use super::{
-        apply_key_action, is_popup_cancel_key, parse_args_from, resolve_key_action, CliError,
-        KeyAction, ParsedArgs,
+        CliError, KeyAction, ParsedArgs, apply_key_action, is_popup_cancel_key, parse_args_from,
+        resolve_key_action,
     };
 
     fn sample_packets() -> Vec<PacketSummary> {

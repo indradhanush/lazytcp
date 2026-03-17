@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use lazytcp::api::{parse_tcpdump_stdout, TcpdumpApi, TcpdumpReadRequest};
+use lazytcp::api::{TcpdumpApi, TcpdumpReadRequest, parse_tcpdump_stdout};
 use lazytcp::app::App;
 use lazytcp::domain::{FilterDimension, PacketSummary};
 
@@ -14,8 +14,8 @@ const ALL_TCP_FLAG_LABELS: [&str; 9] =
     ["NS", "CWR", "ECE", "URG", "ACK", "PSH", "RST", "SYN", "FIN"];
 
 #[test]
-fn filter_candidates_match_tcpdump_baseline_for_all_non_datetime_dimensions(
-) -> Result<(), Box<dyn Error>> {
+fn filter_candidates_match_tcpdump_baseline_for_all_non_datetime_dimensions()
+-> Result<(), Box<dyn Error>> {
     if !tcpdump_available() {
         eprintln!("skipping contract test: tcpdump is not installed");
         return Ok(());
@@ -50,8 +50,8 @@ fn filter_candidates_match_tcpdump_baseline_for_all_non_datetime_dimensions(
 }
 
 #[test]
-fn single_value_filters_match_tcpdump_contract_for_all_non_datetime_dimensions(
-) -> Result<(), Box<dyn Error>> {
+fn single_value_filters_match_tcpdump_contract_for_all_non_datetime_dimensions()
+-> Result<(), Box<dyn Error>> {
     if !tcpdump_available() {
         eprintln!("skipping contract test: tcpdump is not installed");
         return Ok(());

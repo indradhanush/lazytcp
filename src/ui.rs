@@ -1,13 +1,13 @@
+use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{
     Block, BorderType, Borders, Clear, List, ListItem, ListState, Padding, Paragraph, Wrap,
 };
-use ratatui::Frame;
 
 use crate::app::{App, DateTimePopupField, FocusPane};
-use crate::domain::{tcp_packet_details, PacketSummary, TcpPacketDetails};
+use crate::domain::{PacketSummary, TcpPacketDetails, tcp_packet_details};
 
 pub fn render(frame: &mut Frame, app: &App) {
     let root = Layout::default()

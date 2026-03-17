@@ -1320,7 +1320,7 @@ impl Default for App {
 mod tests {
     use crate::domain::{FilterDimension, PacketSummary};
 
-    use super::{endpoint_host, endpoint_port, App, DateTimePopupField, FocusPane};
+    use super::{App, DateTimePopupField, FocusPane, endpoint_host, endpoint_port};
 
     fn sample_packets() -> Vec<PacketSummary> {
         vec![
@@ -2083,10 +2083,11 @@ mod tests {
 
         assert_eq!(app.filter_expression(), "interface = en0");
         assert_eq!(app.packets().len(), 2);
-        assert!(app
-            .packets()
-            .iter()
-            .all(|packet| packet.interface.as_deref() == Some("en0")));
+        assert!(
+            app.packets()
+                .iter()
+                .all(|packet| packet.interface.as_deref() == Some("en0"))
+        );
     }
 
     #[test]
@@ -2177,10 +2178,11 @@ mod tests {
 
         assert_eq!(app.filter_expression(), "dst port = 443");
         assert_eq!(app.packets().len(), 2);
-        assert!(app
-            .packets()
-            .iter()
-            .all(|packet| packet.destination.ends_with(".443")));
+        assert!(
+            app.packets()
+                .iter()
+                .all(|packet| packet.destination.ends_with(".443"))
+        );
     }
 
     #[test]
