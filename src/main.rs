@@ -304,9 +304,21 @@ fn handle_event(app: &mut App) -> AppResult<()> {
                         KeyCode::Char('q') => app.quit(),
                         KeyCode::Char('j') | KeyCode::Down => app.move_down(),
                         KeyCode::Char('k') | KeyCode::Up => app.move_up(),
+                        KeyCode::Char('/') => app.start_filter_popup_search(),
+                        KeyCode::Backspace if app.is_filter_popup_search_active() => {
+                            app.filter_popup_search_backspace()
+                        }
+                        KeyCode::Char(ch) if app.is_filter_popup_search_active() => {
+                            app.filter_popup_search_insert_char(ch)
+                        }
                         KeyCode::Char(' ') => app.toggle_filter_popup_selection(),
                         KeyCode::Char('c') => app.clear_filter_popup_selection(),
-                        KeyCode::Char('C') => app.clear_all_filters(),
+                        KeyCode::Char('C') if !app.is_filter_popup_search_active() => {
+                            app.clear_all_filters()
+                        }
+                        KeyCode::Enter if app.is_filter_popup_search_active() => {
+                            app.stop_filter_popup_search()
+                        }
                         KeyCode::Enter => app.confirm_filter_popup(),
                         _ if is_popup_cancel_key(key.code, key.modifiers) => {
                             app.close_filter_popup()

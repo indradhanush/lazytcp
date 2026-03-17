@@ -1,0 +1,43 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Filter Popup Slash Search
+:END:
+#+TITLE: lazytcp Filter Popup Slash Search
+
+* Objective
+Enable in-popup substring search for value pickers so pressing =/= and typing narrows candidates without restarting the popup.
+
+* Requested Behavior
+- Open a value popup from the filter pane.
+- Press =/= to enter search mode.
+- Type text (for example =10.10=) to narrow visible options.
+- Matching is substring-based (contains), not prefix-only.
+- Existing selection toggles and apply flow continue to work.
+
+* Scope
+In scope:
+- Multi-select popup state updates in =src/app.rs=.
+- Popup key routing updates in =src/main.rs=.
+- Popup rendering hints in =src/ui.rs=.
+- App unit tests for search filtering semantics.
+
+Out of scope:
+- Date-time popup editing behavior.
+- Persisted search history.
+
+* Implementation Plan
+1. Extend multi-select popup state with search query and base candidate list.
+2. Add app methods to start/edit search and recompute visible candidates by case-insensitive substring.
+3. Route =/= and typed characters in non-date popup mode.
+4. Update popup footer/title to indicate search affordance and active query.
+5. Add regression tests for contains-match narrowing and selection persistence under filtered views.
+6. Run =cargo fmt=, =cargo test=, and =cargo check=.
+
+* Verification Outcomes
+- 2026-03-17: Plan created.
+- 2026-03-17: Implemented popup substring search state in =src/app.rs= with contains-match narrowing and search-focused tests.
+- 2026-03-17: Wired popup key handling for =/=, typing, and backspace in =src/main.rs=.
+- 2026-03-17: Updated popup/footer/keybinding help text in =src/ui.rs=.
+- 2026-03-17: Adjusted popup Enter behavior so Enter exits search mode without closing the popup when search is active.
+- 2026-03-17: =cargo fmt= passed.
+- 2026-03-17: =cargo test= passed.
+- 2026-03-17: =cargo check= passed.

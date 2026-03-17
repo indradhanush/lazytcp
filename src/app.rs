@@ -20,9 +20,12 @@ pub enum DateTimePopupField {
 #[derive(Debug, Clone)]
 enum FilterPopupState {
     MultiSelect {
+        all_candidates: Vec<String>,
         candidates: Vec<String>,
         selected_values: BTreeSet<String>,
         highlighted_index: usize,
+        search_query: String,
+        search_active: bool,
     },
     DateTimeRange {
         start_input: String,
@@ -156,6 +159,26 @@ impl App {
             .is_some_and(|popup| popup.dimension == FilterDimension::DateTime)
     }
 
+    pub fn is_filter_popup_search_active(&self) -> bool {
+        let Some(popup) = self.filter_popup.as_ref() else {
+            return false;
+        };
+
+        let FilterPopupState::MultiSelect { search_active, .. } = &popup.state else {
+            return false;
+        };
+
+        *search_active
+    }
+
+    pub fn filter_popup_search_query(&self) -> Option<&str> {
+        let popup = self.filter_popup.as_ref()?;
+        let FilterPopupState::MultiSelect { search_query, .. } = &popup.state else {
+            return None;
+        };
+        Some(search_query.as_str())
+    }
+
     pub fn filter_popup_candidates(&self) -> Option<&[String]> {
         let popup = self.filter_popup.as_ref()?;
         match &popup.state {
@@ -236,13 +259,13 @@ impl App {
                 }
             }
             _ => {
-                let candidates = filter_candidates(&self.all_packets, dimension);
+                let all_candidates = filter_candidates(&self.all_packets, dimension);
                 let selected_values: BTreeSet<String> = self
                     .active_filter_values_for_selected_dimension()
                     .iter()
                     .cloned()
                     .collect();
-                let highlighted_index = candidates
+                let highlighted_index = all_candidates
                     .iter()
                     .position(|candidate| selected_values.contains(candidate))
                     .unwrap_or(0);
@@ -250,9 +273,12 @@ impl App {
                 FilterPopup {
                     dimension,
                     state: FilterPopupState::MultiSelect {
-                        candidates,
+                        candidates: all_candidates.clone(),
+                        all_candidates,
                         selected_values,
                         highlighted_index,
+                        search_query: String::new(),
+                        search_active: false,
                     },
                 }
             }
@@ -270,10 +296,10 @@ impl App {
 
         let selected_values = match popup.state {
             FilterPopupState::MultiSelect {
-                candidates,
+                all_candidates,
                 selected_values,
                 ..
-            } => candidates
+            } => all_candidates
                 .iter()
                 .filter(|candidate| selected_values.contains(*candidate))
                 .cloned()
@@ -305,6 +331,7 @@ impl App {
             candidates,
             selected_values,
             highlighted_index,
+            ..
         } = &mut popup.state
         else {
             return;
@@ -350,6 +377,105 @@ impl App {
             DateTimePopupField::Start => DateTimePopupField::End,
             DateTimePopupField::End => DateTimePopupField::Start,
         };
+    }
+
+    pub fn start_filter_popup_search(&mut self) {
+        let Some(popup) = self.filter_popup.as_mut() else {
+            return;
+        };
+        let FilterPopupState::MultiSelect {
+            all_candidates,
+            candidates,
+            selected_values,
+            highlighted_index,
+            search_query,
+            search_active,
+        } = &mut popup.state
+        else {
+            return;
+        };
+
+        *search_active = true;
+        search_query.clear();
+        refresh_popup_search_candidates(
+            all_candidates,
+            candidates,
+            selected_values,
+            highlighted_index,
+            search_query,
+        );
+    }
+
+    pub fn filter_popup_search_insert_char(&mut self, ch: char) {
+        if ch.is_control() {
+            return;
+        }
+
+        let Some(popup) = self.filter_popup.as_mut() else {
+            return;
+        };
+        let FilterPopupState::MultiSelect {
+            all_candidates,
+            candidates,
+            selected_values,
+            highlighted_index,
+            search_query,
+            search_active,
+        } = &mut popup.state
+        else {
+            return;
+        };
+        if !*search_active {
+            return;
+        }
+
+        search_query.push(ch);
+        refresh_popup_search_candidates(
+            all_candidates,
+            candidates,
+            selected_values,
+            highlighted_index,
+            search_query,
+        );
+    }
+
+    pub fn filter_popup_search_backspace(&mut self) {
+        let Some(popup) = self.filter_popup.as_mut() else {
+            return;
+        };
+        let FilterPopupState::MultiSelect {
+            all_candidates,
+            candidates,
+            selected_values,
+            highlighted_index,
+            search_query,
+            search_active,
+        } = &mut popup.state
+        else {
+            return;
+        };
+        if !*search_active {
+            return;
+        }
+
+        search_query.pop();
+        refresh_popup_search_candidates(
+            all_candidates,
+            candidates,
+            selected_values,
+            highlighted_index,
+            search_query,
+        );
+    }
+
+    pub fn stop_filter_popup_search(&mut self) {
+        let Some(popup) = self.filter_popup.as_mut() else {
+            return;
+        };
+        let FilterPopupState::MultiSelect { search_active, .. } = &mut popup.state else {
+            return;
+        };
+        *search_active = false;
     }
 
     pub fn filter_popup_insert_char(&mut self, ch: char) {
@@ -750,6 +876,52 @@ fn packet_matches_date_time_filter(packet: &PacketSummary, values: &[String]) ->
 
 fn is_allowed_date_time_char(ch: char) -> bool {
     ch.is_ascii_digit() || matches!(ch, '-' | ':' | '.' | ' ')
+}
+
+fn refresh_popup_search_candidates(
+    all_candidates: &[String],
+    candidates: &mut Vec<String>,
+    selected_values: &BTreeSet<String>,
+    highlighted_index: &mut usize,
+    search_query: &str,
+) {
+    let previously_highlighted = candidates.get(*highlighted_index).cloned();
+    let normalized_query = search_query.to_ascii_lowercase();
+
+    *candidates = if normalized_query.is_empty() {
+        all_candidates.to_vec()
+    } else {
+        all_candidates
+            .iter()
+            .filter(|candidate| candidate.to_ascii_lowercase().contains(&normalized_query))
+            .cloned()
+            .collect()
+    };
+
+    if candidates.is_empty() {
+        *highlighted_index = 0;
+        return;
+    }
+
+    if let Some(highlighted) = previously_highlighted {
+        if let Some(index) = candidates
+            .iter()
+            .position(|candidate| candidate == &highlighted)
+        {
+            *highlighted_index = index;
+            return;
+        }
+    }
+
+    if let Some(index) = candidates
+        .iter()
+        .position(|candidate| selected_values.contains(candidate))
+    {
+        *highlighted_index = index;
+        return;
+    }
+
+    *highlighted_index = 0;
 }
 
 fn filter_candidates(packets: &[PacketSummary], dimension: FilterDimension) -> Vec<String> {
@@ -1317,6 +1489,38 @@ mod tests {
         ]
     }
 
+    fn sample_packets_for_popup_search() -> Vec<PacketSummary> {
+        vec![
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                interface: None,
+                source: "172.16.10.10.5000".to_string(),
+                destination: "8.8.8.8.53".to_string(),
+                protocol: "UDP".to_string(),
+                length: 0,
+                summary: "UDP, length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                interface: None,
+                source: "10.10.1.9.5001".to_string(),
+                destination: "1.1.1.1.53".to_string(),
+                protocol: "UDP".to_string(),
+                length: 0,
+                summary: "UDP, length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                interface: None,
+                source: "192.168.2.5.5002".to_string(),
+                destination: "203.0.113.5.53".to_string(),
+                protocol: "UDP".to_string(),
+                length: 0,
+                summary: "UDP, length 0".to_string(),
+            },
+        ]
+    }
+
     fn select_filter_dimension(app: &mut App, target: FilterDimension) {
         for _ in 0..app.filter_dimensions().len() {
             if app.selected_filter_dimension() == target {
@@ -1331,6 +1535,13 @@ mod tests {
     fn type_into_date_time_popup(app: &mut App, value: &str) {
         for ch in value.chars() {
             app.filter_popup_insert_char(ch);
+        }
+    }
+
+    fn type_into_filter_popup_search(app: &mut App, value: &str) {
+        app.start_filter_popup_search();
+        for ch in value.chars() {
+            app.filter_popup_search_insert_char(ch);
         }
     }
 
@@ -1488,6 +1699,74 @@ mod tests {
                 "8.8.8.8".to_string(),
             ]
         );
+    }
+
+    #[test]
+    fn popup_search_filters_candidates_by_substring_match_anywhere() {
+        let mut app = App::with_packets(sample_packets_for_popup_search(), String::new());
+
+        app.open_filter_popup();
+        assert!(!app.is_filter_popup_search_active());
+        type_into_filter_popup_search(&mut app, "10.10");
+
+        assert!(app.is_filter_popup_search_active());
+        assert_eq!(app.filter_popup_search_query(), Some("10.10"));
+        let narrowed = app
+            .filter_popup_candidates()
+            .expect("host popup should expose narrowed candidates");
+        assert_eq!(
+            narrowed,
+            &["10.10.1.9".to_string(), "172.16.10.10".to_string()]
+        );
+
+        for _ in 0.."10.10".chars().count() {
+            app.filter_popup_search_backspace();
+        }
+        assert_eq!(app.filter_popup_search_query(), Some(""));
+        let widened = app
+            .filter_popup_candidates()
+            .expect("host popup should expose all candidates once query is cleared");
+        assert_eq!(
+            widened,
+            &[
+                "1.1.1.1".to_string(),
+                "10.10.1.9".to_string(),
+                "172.16.10.10".to_string(),
+                "192.168.2.5".to_string(),
+                "203.0.113.5".to_string(),
+                "8.8.8.8".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn popup_confirm_keeps_values_selected_before_search_narrowing() {
+        let mut app = App::with_packets(sample_packets_for_popup_search(), String::new());
+
+        app.open_filter_popup();
+        app.toggle_filter_popup_selection();
+        type_into_filter_popup_search(&mut app, "10.10");
+        app.confirm_filter_popup();
+
+        assert_eq!(app.filter_expression(), "host = 1.1.1.1");
+        assert_eq!(app.packets().len(), 1);
+        assert_eq!(app.packets()[0].destination, "1.1.1.1.53");
+    }
+
+    #[test]
+    fn stop_filter_popup_search_disables_search_mode_without_closing_popup() {
+        let mut app = App::with_packets(sample_packets_for_popup_search(), String::new());
+
+        app.open_filter_popup();
+        type_into_filter_popup_search(&mut app, "10.10");
+        assert!(app.is_filter_popup_search_active());
+        assert_eq!(app.filter_popup_search_query(), Some("10.10"));
+
+        app.stop_filter_popup_search();
+
+        assert!(app.is_filter_popup_open());
+        assert!(!app.is_filter_popup_search_active());
+        assert_eq!(app.filter_popup_search_query(), Some("10.10"));
     }
 
     #[test]

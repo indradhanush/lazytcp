@@ -424,7 +424,7 @@ fn render_filter_bar(frame: &mut Frame, app: &App, area: Rect) {
 
 fn render_footer(frame: &mut Frame, area: Rect) {
     let footer = Paragraph::new(
-        "q: quit | ?: keybindings | filter by pane: c clear selected category | enter: open popup | value popup: space toggle, c clear category | date-time popup: type start/end, tab switch, c clear fields | C clear all | enter apply | esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
+        "q: quit | ?: keybindings | filter by pane: c clear selected category | enter: open popup | value popup: / search, space toggle, c clear category | date-time popup: type start/end, tab switch, c clear fields | C clear all | enter apply | esc cancel | j/k or arrows: move | tab/shift+tab: cycle focus",
     );
     frame.render_widget(footer, area);
 }
@@ -446,12 +446,17 @@ fn render_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
         .filter_popup_dimension()
         .map(|value| value.display_name())
         .unwrap_or("filter");
+    let search_query = app.filter_popup_search_query().unwrap_or("");
+    let is_search_active = app.is_filter_popup_search_active();
     let candidates = app.filter_popup_candidates().unwrap_or(&[]);
 
     let items: Vec<ListItem> = if candidates.is_empty() {
-        vec![ListItem::new(Line::raw(
-            "No values available for this filter type",
-        ))]
+        let empty_message = if search_query.is_empty() {
+            "No values available for this filter type".to_string()
+        } else {
+            format!("No values match /{search_query}")
+        };
+        vec![ListItem::new(Line::raw(empty_message))]
     } else {
         candidates
             .iter()
@@ -467,9 +472,13 @@ fn render_filter_popup(frame: &mut Frame, app: &App, area: Rect) {
             .collect()
     };
 
-    let popup_title = format!("Select {} values", dimension);
+    let popup_title = if is_search_active || !search_query.is_empty() {
+        format!("Select {} values /{}", dimension, search_query)
+    } else {
+        format!("Select {} values", dimension)
+    };
     let popup_footer = Line::raw(
-        "space: toggle | c: clear category | C: clear all filters | enter: apply | esc: cancel",
+        "/: search | backspace: erase search | space: toggle | c: clear category | C: clear all filters | enter: apply | esc: cancel",
     )
     .alignment(Alignment::Right);
     let list = List::new(items)
@@ -621,6 +630,9 @@ fn render_keybindings_popup(frame: &mut Frame, app: &App, area: Rect) {
         Line::raw("  c: clear selected filter category"),
         Line::raw(""),
         Line::raw("Filter Value Popup"),
+        Line::raw("  /: start substring search"),
+        Line::raw("  type to narrow candidates"),
+        Line::raw("  backspace: delete search character"),
         Line::raw("  space: toggle selected value"),
         Line::raw("  c: clear values in current category"),
         Line::raw("  C: clear all active filters"),
