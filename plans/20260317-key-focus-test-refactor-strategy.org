@@ -49,9 +49,9 @@ Completed:
 - Step 2 completed in =src/main.rs= by introducing a shared =KeyAction= enum with =resolve_key_action= (mapping) and =apply_key_action= (execution), used by runtime handling and tests.
 - Step 3 completed with Given/When/Then scenario tests covering no-search confirm, search-active enter behavior, search-cleared confirm, and date-time confirm focus behavior.
 
-Pending:
+Remaining:
 - Step 4 completed in =src/main.rs= with =popup_confirm_focus_transition_matrix= table-driven coverage for confirm flows.
-- Step 5 pending: route remaining focus assertions through the matrix helper to reduce duplication.
+- Step 5 completed by removing redundant single-case popup-confirm focus assertions in =src/main.rs= and relying on the matrix test as the primary confirm-focus contract.
 
 * Risks and Mitigations
 - Risk: Refactor may inadvertently alter runtime key semantics.
@@ -69,6 +69,7 @@ Pending:
 - 2026-03-17: Implemented testable key-press routing extraction and scenario tests (commit =a0526d9=).
 - 2026-03-17: Implemented shared key-action mapping/execution path in =src/main.rs= and added action-mapping tests for representative flows.
 - 2026-03-17: Added table-driven popup confirm focus matrix test in =src/main.rs= covering no-search, search-active, search-cleared, and date-time confirm outcomes.
+- 2026-03-17: Consolidated popup-confirm focus checks by routing remaining confirm-focus coverage through the matrix test and removing duplicated one-off focus tests.
 - 2026-03-17: =cargo fmt= passed for the implemented slice.
 - 2026-03-17: =cargo test= passed for the implemented slice.
 - 2026-03-17: =cargo check= passed for the implemented slice.

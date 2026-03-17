@@ -565,17 +565,6 @@ mod tests {
     }
 
     #[test]
-    fn given_no_search_when_confirm_multiselect_popup_then_focus_stays_filter() {
-        let mut app = App::with_packets(sample_packets(), String::new());
-
-        press_key(&mut app, KeyCode::Enter);
-        press_key(&mut app, KeyCode::Char(' '));
-        press_key(&mut app, KeyCode::Enter);
-
-        assert_eq!(app.focus(), FocusPane::FilterSelector);
-    }
-
-    #[test]
     fn given_search_active_when_press_enter_then_search_exits_and_popup_stays_open() {
         let mut app = App::with_packets(sample_packets(), String::new());
 
@@ -586,34 +575,6 @@ mod tests {
 
         assert!(app.is_filter_popup_open());
         assert!(!app.is_filter_popup_search_active());
-    }
-
-    #[test]
-    fn given_search_cleared_when_confirm_multiselect_popup_then_focus_stays_filter() {
-        let mut app = App::with_packets(sample_packets(), String::new());
-
-        press_key(&mut app, KeyCode::Enter);
-        press_key(&mut app, KeyCode::Char('/'));
-        type_text(&mut app, "10");
-        press_key(&mut app, KeyCode::Backspace);
-        press_key(&mut app, KeyCode::Backspace);
-        press_key(&mut app, KeyCode::Enter);
-        press_key(&mut app, KeyCode::Char(' '));
-        press_key(&mut app, KeyCode::Enter);
-
-        assert_eq!(app.focus(), FocusPane::FilterSelector);
-    }
-
-    #[test]
-    fn given_date_time_popup_when_confirm_then_focus_moves_packets() {
-        let mut app = App::with_packets(sample_packets(), String::new());
-        select_filter_dimension(&mut app, FilterDimension::DateTime);
-
-        press_key(&mut app, KeyCode::Enter);
-        type_text(&mut app, "1970-01-01 00:00:02.002000");
-        press_key(&mut app, KeyCode::Enter);
-
-        assert_eq!(app.focus(), FocusPane::PacketList);
     }
 
     #[test]
