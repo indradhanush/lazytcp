@@ -67,6 +67,13 @@ Use small, verifiable slices:
 3. Run tests (or add them first for domain/capture logic changes).
 4. Confirm no regressions before expanding scope.
 
+### Keyboard/Focus Workflow Note (Required)
+
+- For keybinding or focus-transition changes, write explicit Given/When/Then interaction scenarios before implementation.
+- Scenarios must cover all three flows when relevant: search active, search cleared, and no-search.
+- Add or update tests to assert both positive and negative focus outcomes for the changed keys.
+- Keep a small focus-transition matrix for popup confirm behavior and update it with each focus contract change.
+
 ## Plan Scope and Precedence
 
 - Plan mode is required for non-trivial work (3+ steps, multi-file implementation, architecture decisions, or production-risk behavior changes).
