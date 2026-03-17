@@ -1,0 +1,58 @@
+:PROPERTIES:
+:CATEGORY: lazytcp Key Focus Test Refactor Strategy
+:END:
+#+TITLE: lazytcp Key/Focus Test Strategy and Refactor Plan
+
+* Objective
+Harden keyboard and focus behavior changes by introducing a scenario-driven test strategy and refactoring event handling so key-sequence flows are directly testable.
+
+* Problem Statement
+Recent popup focus fixes required multiple iterations because behavior was validated in narrow paths and existing tests encoded stale focus expectations.
+
+* Scope
+In scope:
+- Define a compact focus-transition matrix for popup confirm behavior.
+- Add scenario tests for key/focus interactions across search active, search cleared, and no-search flows.
+- Refactor event routing boundaries to make key-sequence behavior unit-testable without terminal I/O.
+
+Out of scope:
+- Packet parsing/capture backend changes.
+- UI rendering redesign.
+
+* Target Outcomes
+- Focus contracts are explicit, test-backed, and resistant to regressions.
+- Keybinding behavior can be validated by deterministic unit tests over interaction sequences.
+- Future focus/keybinding changes require fewer reactive bug-fix iterations.
+
+* Focus Transition Matrix (Initial)
+- Multi-select popup confirm (=Enter=): focus remains on Filter pane.
+- Date-time popup confirm (=Enter=): focus moves to Packets pane.
+- Popup search-mode =Enter=: exits search mode without closing popup.
+- Popup cancel (=Esc=): closes popup, preserving prior pane focus contract.
+
+* Implementation Plan
+1. Extract popup key handling into a pure app-level command function (input event -> action) that does not depend on terminal polling.
+2. Introduce a small domain enum for keyboard actions used by both runtime event mapping and tests.
+3. Add scenario tests using Given/When/Then naming for:
+   - no-search multi-select confirm,
+   - search active confirm,
+   - search entered then cleared confirm,
+   - search-mode enter-to-exit,
+   - date-time confirm.
+4. Consolidate focus assertions into a table-driven focus-matrix test for popup confirm transitions.
+5. Keep existing behavior tests that verify filter expression and packet narrowing, but route focus assertions through the matrix where possible.
+6. Run =cargo fmt=, =cargo test=, and =cargo check= after each slice.
+
+* Risks and Mitigations
+- Risk: Refactor may inadvertently alter runtime key semantics.
+  - Mitigation: keep runtime mapping thin and covered by compatibility tests.
+- Risk: Duplicate assertions across old/new tests increase maintenance cost.
+  - Mitigation: centralize focus-transition expectations in a matrix helper.
+
+* Definition of Done
+- Key/focus behavior for popup flows is represented in a documented matrix.
+- Scenario tests cover all required flows and pass reliably.
+- Refactored input-to-action path is testable without interactive terminal harness.
+
+* Verification Outcomes
+- 2026-03-17: Plan created.
