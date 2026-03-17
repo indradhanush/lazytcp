@@ -1,6 +1,6 @@
 .PHONY: all fmt test check build coverage
 
-all: fmt test check
+all: fmt test check build
 
 fmt:
 	cargo fmt
