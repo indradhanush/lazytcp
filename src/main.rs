@@ -260,104 +260,92 @@ fn reset_cursor_color(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> 
 fn handle_event(app: &mut App) -> AppResult<()> {
     if let Event::Key(key) = event::read()? {
         if key.kind == KeyEventKind::Press {
-            if app.is_keybindings_popup_open() {
-                match key.code {
-                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                        app.quit()
-                    }
-                    KeyCode::Char('q') => app.quit(),
-                    KeyCode::Esc | KeyCode::Enter | KeyCode::Char('?') => {
-                        app.close_keybindings_popup()
-                    }
-                    _ => {}
-                }
-                return Ok(());
-            }
-
-            if key.code == KeyCode::Char('?') {
-                app.open_keybindings_popup();
-                return Ok(());
-            }
-
-            if app.is_filter_popup_open() {
-                if app.is_filter_popup_date_time() {
-                    match key.code {
-                        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                            app.quit()
-                        }
-                        KeyCode::Char('q') => app.quit(),
-                        KeyCode::Char('j') | KeyCode::Down => app.move_down(),
-                        KeyCode::Char('k') | KeyCode::Up => app.move_up(),
-                        KeyCode::Tab | KeyCode::BackTab => {
-                            app.filter_popup_switch_date_time_field()
-                        }
-                        KeyCode::Backspace => app.filter_popup_backspace(),
-                        KeyCode::Char('c') => app.clear_filter_popup_selection(),
-                        KeyCode::Char('C') => app.clear_all_filters(),
-                        KeyCode::Enter => app.confirm_filter_popup(),
-                        KeyCode::Char(ch) => app.filter_popup_insert_char(ch),
-                        _ if is_popup_cancel_key(key.code, key.modifiers) => {
-                            app.close_filter_popup()
-                        }
-                        _ => {}
-                    }
-                } else {
-                    match key.code {
-                        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                            app.quit()
-                        }
-                        KeyCode::Char('q') => app.quit(),
-                        KeyCode::Char('j') | KeyCode::Down => app.move_down(),
-                        KeyCode::Char('k') | KeyCode::Up => app.move_up(),
-                        KeyCode::Char('/') => app.start_filter_popup_search(),
-                        KeyCode::Backspace if app.is_filter_popup_search_active() => {
-                            app.filter_popup_search_backspace()
-                        }
-                        KeyCode::Char(ch) if app.is_filter_popup_search_active() => {
-                            app.filter_popup_search_insert_char(ch)
-                        }
-                        KeyCode::Char(' ') => app.toggle_filter_popup_selection(),
-                        KeyCode::Char('c') => app.clear_filter_popup_selection(),
-                        KeyCode::Char('C') if !app.is_filter_popup_search_active() => {
-                            app.clear_all_filters()
-                        }
-                        KeyCode::Enter if app.is_filter_popup_search_active() => {
-                            app.stop_filter_popup_search()
-                        }
-                        KeyCode::Enter => app.confirm_filter_popup(),
-                        _ if is_popup_cancel_key(key.code, key.modifiers) => {
-                            app.close_filter_popup()
-                        }
-                        _ => {}
-                    }
-                }
-                return Ok(());
-            }
-
-            match key.code {
-                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => app.quit(),
-                KeyCode::Enter if app.focus() == FocusPane::FilterInput => app.focus_packet_list(),
-                KeyCode::Enter if app.focus() == FocusPane::FilterSelector => {
-                    app.open_filter_popup()
-                }
-                KeyCode::Char('c') if app.focus() == FocusPane::FilterSelector => {
-                    app.clear_selected_filter_dimension()
-                }
-                KeyCode::Char('q') => app.quit(),
-                KeyCode::Char('C') => app.clear_all_filters(),
-                KeyCode::Char('0') => app.focus_filter_selector(),
-                KeyCode::Char('1') => app.focus_packet_list(),
-                KeyCode::Char('/') => app.focus_filter_selector(),
-                KeyCode::Char('j') | KeyCode::Down => app.move_down(),
-                KeyCode::Char('k') | KeyCode::Up => app.move_up(),
-                KeyCode::Tab => app.cycle_focus(),
-                KeyCode::BackTab => app.reverse_cycle_focus(),
-                _ => {}
-            }
+            handle_key_press(app, key.code, key.modifiers);
         }
     }
 
     Ok(())
+}
+
+fn handle_key_press(app: &mut App, key_code: KeyCode, modifiers: KeyModifiers) {
+    if app.is_keybindings_popup_open() {
+        match key_code {
+            KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => app.quit(),
+            KeyCode::Char('q') => app.quit(),
+            KeyCode::Esc | KeyCode::Enter | KeyCode::Char('?') => app.close_keybindings_popup(),
+            _ => {}
+        }
+        return;
+    }
+
+    if key_code == KeyCode::Char('?') {
+        app.open_keybindings_popup();
+        return;
+    }
+
+    if app.is_filter_popup_open() {
+        if app.is_filter_popup_date_time() {
+            match key_code {
+                KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => app.quit(),
+                KeyCode::Char('q') => app.quit(),
+                KeyCode::Char('j') | KeyCode::Down => app.move_down(),
+                KeyCode::Char('k') | KeyCode::Up => app.move_up(),
+                KeyCode::Tab | KeyCode::BackTab => app.filter_popup_switch_date_time_field(),
+                KeyCode::Backspace => app.filter_popup_backspace(),
+                KeyCode::Char('c') => app.clear_filter_popup_selection(),
+                KeyCode::Char('C') => app.clear_all_filters(),
+                KeyCode::Enter => app.confirm_filter_popup(),
+                KeyCode::Char(ch) => app.filter_popup_insert_char(ch),
+                _ if is_popup_cancel_key(key_code, modifiers) => app.close_filter_popup(),
+                _ => {}
+            }
+        } else {
+            match key_code {
+                KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => app.quit(),
+                KeyCode::Char('q') => app.quit(),
+                KeyCode::Char('j') | KeyCode::Down => app.move_down(),
+                KeyCode::Char('k') | KeyCode::Up => app.move_up(),
+                KeyCode::Char('/') => app.start_filter_popup_search(),
+                KeyCode::Backspace if app.is_filter_popup_search_active() => {
+                    app.filter_popup_search_backspace()
+                }
+                KeyCode::Char(ch) if app.is_filter_popup_search_active() => {
+                    app.filter_popup_search_insert_char(ch)
+                }
+                KeyCode::Char(' ') => app.toggle_filter_popup_selection(),
+                KeyCode::Char('c') => app.clear_filter_popup_selection(),
+                KeyCode::Char('C') if !app.is_filter_popup_search_active() => {
+                    app.clear_all_filters()
+                }
+                KeyCode::Enter if app.is_filter_popup_search_active() => {
+                    app.stop_filter_popup_search()
+                }
+                KeyCode::Enter => app.confirm_filter_popup(),
+                _ if is_popup_cancel_key(key_code, modifiers) => app.close_filter_popup(),
+                _ => {}
+            }
+        }
+        return;
+    }
+
+    match key_code {
+        KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => app.quit(),
+        KeyCode::Enter if app.focus() == FocusPane::FilterInput => app.focus_packet_list(),
+        KeyCode::Enter if app.focus() == FocusPane::FilterSelector => app.open_filter_popup(),
+        KeyCode::Char('c') if app.focus() == FocusPane::FilterSelector => {
+            app.clear_selected_filter_dimension()
+        }
+        KeyCode::Char('q') => app.quit(),
+        KeyCode::Char('C') => app.clear_all_filters(),
+        KeyCode::Char('0') => app.focus_filter_selector(),
+        KeyCode::Char('1') => app.focus_packet_list(),
+        KeyCode::Char('/') => app.focus_filter_selector(),
+        KeyCode::Char('j') | KeyCode::Down => app.move_down(),
+        KeyCode::Char('k') | KeyCode::Up => app.move_up(),
+        KeyCode::Tab => app.cycle_focus(),
+        KeyCode::BackTab => app.reverse_cycle_focus(),
+        _ => {}
+    }
 }
 
 fn is_popup_cancel_key(code: KeyCode, modifiers: KeyModifiers) -> bool {
@@ -368,8 +356,62 @@ fn is_popup_cancel_key(code: KeyCode, modifiers: KeyModifiers) -> bool {
 #[cfg(test)]
 mod tests {
     use crossterm::event::{KeyCode, KeyModifiers};
+    use lazytcp::app::{App, FocusPane};
+    use lazytcp::domain::{FilterDimension, PacketSummary};
 
-    use super::{is_popup_cancel_key, parse_args_from, CliError, ParsedArgs};
+    use super::{handle_key_press, is_popup_cancel_key, parse_args_from, CliError, ParsedArgs};
+
+    fn sample_packets() -> Vec<PacketSummary> {
+        vec![
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:01.001000".to_string(),
+                interface: None,
+                source: "10.0.0.12.51544".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 0,
+                summary: "Flags [S], length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:02.002000".to_string(),
+                interface: None,
+                source: "10.0.0.12.34211".to_string(),
+                destination: "8.8.8.8.53".to_string(),
+                protocol: "UDP".to_string(),
+                length: 0,
+                summary: "UDP, length 0".to_string(),
+            },
+            PacketSummary {
+                timestamp: "1970-01-01 00:00:03.003000".to_string(),
+                interface: None,
+                source: "192.168.1.5.60000".to_string(),
+                destination: "1.1.1.1.443".to_string(),
+                protocol: "TCP".to_string(),
+                length: 0,
+                summary: "Flags [.], length 0".to_string(),
+            },
+        ]
+    }
+
+    fn press_key(app: &mut App, key_code: KeyCode) {
+        handle_key_press(app, key_code, KeyModifiers::NONE);
+    }
+
+    fn type_text(app: &mut App, value: &str) {
+        for ch in value.chars() {
+            press_key(app, KeyCode::Char(ch));
+        }
+    }
+
+    fn select_filter_dimension(app: &mut App, target: FilterDimension) {
+        for _ in 0..app.filter_dimensions().len() {
+            if app.selected_filter_dimension() == target {
+                return;
+            }
+            app.next_filter_dimension();
+        }
+        panic!("failed to select filter dimension: {target:?}");
+    }
 
     #[test]
     fn missing_pcap_argument_returns_usage_error() {
@@ -413,5 +455,57 @@ mod tests {
             KeyModifiers::CONTROL
         ));
         assert!(!is_popup_cancel_key(KeyCode::Char('['), KeyModifiers::NONE));
+    }
+
+    #[test]
+    fn given_no_search_when_confirm_multiselect_popup_then_focus_stays_filter() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        press_key(&mut app, KeyCode::Enter);
+        press_key(&mut app, KeyCode::Char(' '));
+        press_key(&mut app, KeyCode::Enter);
+
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+    }
+
+    #[test]
+    fn given_search_active_when_press_enter_then_search_exits_and_popup_stays_open() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        press_key(&mut app, KeyCode::Enter);
+        press_key(&mut app, KeyCode::Char('/'));
+        type_text(&mut app, "10.0");
+        press_key(&mut app, KeyCode::Enter);
+
+        assert!(app.is_filter_popup_open());
+        assert!(!app.is_filter_popup_search_active());
+    }
+
+    #[test]
+    fn given_search_cleared_when_confirm_multiselect_popup_then_focus_stays_filter() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+
+        press_key(&mut app, KeyCode::Enter);
+        press_key(&mut app, KeyCode::Char('/'));
+        type_text(&mut app, "10");
+        press_key(&mut app, KeyCode::Backspace);
+        press_key(&mut app, KeyCode::Backspace);
+        press_key(&mut app, KeyCode::Enter);
+        press_key(&mut app, KeyCode::Char(' '));
+        press_key(&mut app, KeyCode::Enter);
+
+        assert_eq!(app.focus(), FocusPane::FilterSelector);
+    }
+
+    #[test]
+    fn given_date_time_popup_when_confirm_then_focus_moves_packets() {
+        let mut app = App::with_packets(sample_packets(), String::new());
+        select_filter_dimension(&mut app, FilterDimension::DateTime);
+
+        press_key(&mut app, KeyCode::Enter);
+        type_text(&mut app, "1970-01-01 00:00:02.002000");
+        press_key(&mut app, KeyCode::Enter);
+
+        assert_eq!(app.focus(), FocusPane::PacketList);
     }
 }
