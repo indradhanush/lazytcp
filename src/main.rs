@@ -340,6 +340,8 @@ fn handle_event(app: &mut App) -> AppResult<()> {
                 }
                 KeyCode::Char('q') => app.quit(),
                 KeyCode::Char('C') => app.clear_all_filters(),
+                KeyCode::Char('0') => app.focus_filter_selector(),
+                KeyCode::Char('1') => app.focus_packet_list(),
                 KeyCode::Char('/') => app.focus_filter_selector(),
                 KeyCode::Char('j') | KeyCode::Down => app.move_down(),
                 KeyCode::Char('k') | KeyCode::Up => app.move_up(),
