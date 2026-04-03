@@ -5,6 +5,9 @@
 `lazytcp` is a TUI for interactively filtering packets from a `.pcap` file. It aims to provide a clean, fast and intuitive UX.
 Hat tip to the awesome [lazygit](https://github.com/jesseduffield/lazygit) TUI for the name inspiration. 🙌
 
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/bb013689-5dab-4a92-bd99-66cd7b121268" width="100%" autoplay loop muted controls></video>
+</div>
 
 ## Requirements
 
